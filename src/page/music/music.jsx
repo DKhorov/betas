@@ -209,34 +209,7 @@ const Music = () => {
       }}
     >
       {/* HEADER / TOP CHART BANNER */}
-      <Paper elevation={6} sx={{ height:isMobile?180:260, borderRadius:3, p:4, mb:4, position:'relative', display:'flex', flexDirection:'column', justifyContent:'flex-end', color:'white', background:
-          "linear-gradient(rgba(0,0,0,.3), rgba(0,0,0,.7)), url('https://wallpapercat.com/w/full/1/9/6/38262-3840x2160-desktop-4k-the-weeknd-wallpaper-photo.jpg')",
-        backgroundSize:'cover', backgroundPosition:'center' }}>
-        
-        <Box sx={{ position:"absolute", top:16, right:16 }}>
-          {/* Предполагается, что StoreIcon - это SVG-компонент */}
-          <StoreIcon style={{ width:33, height:33 }} /> 
-        </Box>
-
-        <Typography variant={isMobile?"h5":"h3"} fontWeight="800" sx={{ mb:2 }}>
-          Atom Music
-        </Typography>
-        <Typography variant={isMobile?"body2":"h7"} sx={{ opacity:0.9, mb:2 }}>
-Десктоп‑версия AtomGlide для прослушивания музыки на вашем ПК и веб‑версия для телефонов.        </Typography>
-
-        <Button 
-          startIcon={<PlayArrowIcon />} 
-          variant="contained" 
-          onClick={() => {
-             // Играть первый трек из рекомендаций или общего списка
-             const listToPlay = recommendations.length ? recommendations : allTracks;
-             if(listToPlay.length) handlePlay(listToPlay[0], 0, listToPlay);
-          }}
-          sx={{ width:"auto", borderRadius:'30px', fontWeight:'bold', background:"#ed5d19", '&:hover':{ background:"#d14d10"} }}
-        >
-            Не доступно в Beta 
-        </Button>
-      </Paper>
+   
 
       {/* --- RECOMMENDATIONS SECTION --- */}
       <Box sx={{ mb: 4 }}>
@@ -386,5 +359,6 @@ const TrackItem = ({ track, index, isLiked, onPlay, onLike, isActive }) => {
     </Box>
   );
 };
+
 
 export default Music;
