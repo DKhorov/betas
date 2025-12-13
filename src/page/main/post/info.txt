@@ -1,0 +1,13 @@
+Folder: post
+Files: 6
+
+PostHeadeAcc.jsx - 7.79 KB
+PostHeader.jsx - 8.23 KB
+PostPhoto.jsx - 5.55 KB
+PostSkeleton.jsx - 2.37 KB
+PostText.jsx - 3.83 KB
+PostWithComments.jsx - 6.99 KB
+
+Author: Dmitry Khorov
+Telegram: @dkdevelop @jpegweb
+DK Studio Production

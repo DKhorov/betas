@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Pixel Art Editor Pro</title>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --panel-color: #2d2d2d;
+            --text-color: #e0e0e0;
+            --accent-color: #007acc;
+            --border-color: #444;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            background-color: var(--panel-color);
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .group {
+            display: flex;
+            gap: 5px;
+            padding-right: 10px;
+            border-right: 1px solid var(--border-color);
+            align-items: center;
+        }
+        .group:last-child { border-right: none; }
+
+        button, input[type="number"], select {
+            background-color: #3c3c3c;
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover { background-color: #505050; }
+        button.active { background-color: var(--accent-color); border-color: #005f9e; }
+
+        input[type="color"] {
+            border: none;
+            width: 40px;
+            height: 30px;
+            cursor: pointer;
+            background: none;
+        }
+
+        label { font-size: 12px; margin-right: 5px; }
+
+        /* Workspace */
+        #workspace {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-image: 
+                linear-gradient(45deg, #252525 25%, transparent 25%), 
+                linear-gradient(-45deg, #252525 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #252525 75%), 
+                linear-gradient(-45deg, transparent 75%, #252525 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            cursor: crosshair;
+        }
+
+        canvas {
+            image-rendering: pixelated; /* Важно для пиксель-арта */
+            display: block;
+        }
+
+        .status-bar {
+            background-color: var(--panel-color);
+            padding: 5px 10px;
+            font-size: 12px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+<div class="toolbar">
+    <div class="group">
+        <label>Ширина:</label>
+        <input type="number" id="gridW" value="32" min="1" max="1000" style="width: 50px;">
+        <label>Высота:</label>
+        <input type="number" id="gridH" value="32" min="1" max="1000" style="width: 50px;">
+        <button onclick="resizeGrid()">Создать</button>
+    </div>
+
+    <div class="group">
+        <input type="color" id="colorPicker" value="#000000">
+        <button id="btnPencil" class="active" onclick="setTool('pencil')">✏️</button>
+        <button id="btnEraser" onclick="setTool('eraser')">🧹 Ластик</button>
+        <button id="btnFill" onclick="setTool('fill')">🪣 Заливка</button>
+        <button id="btnPicker" onclick="setTool('picker')">💉 Пипетка</button>
+    </div>
+
+    <div class="group">
+        <button onclick="resetView()">👁️ Сброс вида</button>
+        <label><input type="checkbox" id="showGrid" checked onchange="requestRender()"> Сетка</label>
+    </div>
+
+    <div class="group">
+        <select id="exportFormat">
+            <option value="png">PNG</option>
+            <option value="jpeg">JPEG</option>
+            <option value="webp">WEBP</option>
+            <option value="svg">SVG</option>
+            <option value="html">HTML</option>
+            <option value="obj">OBJ (3D)</option>
+        </select>
+        <button onclick="exportFile()">💾 Сохранить</button>
+    </div>
+</div>
+
+<div id="workspace">
+    <canvas id="mainCanvas"></canvas>
+</div>
+
+<div class="status-bar">
+    <span id="coords">X: 0, Y: 0</span>
+    <span>Колесо: Зум | Средняя кнопка/Пробел: Перемещение</span>
+</div>
+
+<script>
+    // --- Конфигурация ---
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    const workspace = document.getElementById('workspace');
+    
+    // Состояние
+    let gridWidth = 32;
+    let gridHeight = 32;
+    let pixels = []; // Двумерный массив [y][x] хранит строки цветов (hex) или null
+    
+    let scale = 20; // Уровень зума
+    let panX = 0;
+    let panY = 0;
+    
+    let isDrawing = false;
+    let isPanning = false;
+    let lastMouseX, lastMouseY;
+    
+    let currentTool = 'pencil';
+    let primaryColor = '#000000';
+
+    // --- Инициализация ---
+    function initPixels(w, h) {
+        let newPixels = [];
+        for (let y = 0; y < h; y++) {
+            let row = [];
+            for (let x = 0; x < w; x++) {
+                row.push(null);
+            }
+            newPixels.push(row);
+        }
+        return newPixels;
+    }
+
+    function resizeGrid() {
+        const w = parseInt(document.getElementById('gridW').value);
+        const h = parseInt(document.getElementById('gridH').value);
+        if (w > 0 && h > 0) {
+            if(confirm("Создание новой сетки сотрет текущий рисунок. Продолжить?")) {
+                gridWidth = w;
+                gridHeight = h;
+                pixels = initPixels(w, h);
+                resetView();
+                requestRender();
+            }
+        }
+    }
+
+    function resetView() {
+        // Центрируем сетку
+        scale = Math.min(workspace.clientWidth / gridWidth, workspace.clientHeight / gridHeight) * 0.8;
+        if (scale < 1) scale = 1;
+        panX = (workspace.clientWidth - gridWidth * scale) / 2;
+        panY = (workspace.clientHeight - gridHeight * scale) / 2;
+        requestRender();
+    }
+
+    // Первоначальный запуск
+    pixels = initPixels(gridWidth, gridHeight);
+    
+    // Подстраиваем размер canvas под окно
+    function resizeCanvas() {
+        canvas.width = workspace.clientWidth;
+        canvas.height = workspace.clientHeight;
+        requestRender();
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    resetView();
+
+    // --- Рендеринг ---
+    function requestRender() {
+        window.requestAnimationFrame(render);
+    }
+
+    function render() {
+        // Очистка
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.save();
+        ctx.translate(panX, panY);
+        ctx.scale(scale, scale);
+
+        // Рисуем фон сетки (белый)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, gridWidth, gridHeight);
+
+        // Рисуем пиксели
+        for (let y = 0; y < gridHeight; y++) {
+            for (let x = 0; x < gridWidth; x++) {
+                if (pixels[y][x]) {
+                    ctx.fillStyle = pixels[y][x];
+                    // Рисуем чуть больше 1, чтобы избежать линий стыков при зуме
+                    ctx.fillRect(x, y, 1.05, 1.05); 
+                }
+            }
+        }
+
+        // Рисуем сетку
+        if (document.getElementById('showGrid').checked && scale > 5) {
+            ctx.lineWidth = 0.05; // Тонкая линия относительно зума
+            ctx.strokeStyle = '#ccc';
+            
+            ctx.beginPath();
+            // Вертикальные
+            for (let x = 0; x <= gridWidth; x++) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, gridHeight);
+            }
+            // Горизонтальные
+            for (let y = 0; y <= gridHeight; y++) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(gridWidth, y);
+            }
+            ctx.stroke();
+        }
+
+        // Граница холста
+        ctx.lineWidth = 2 / scale;
+        ctx.strokeStyle = '#444';
+        ctx.strokeRect(0, 0, gridWidth, gridHeight);
+
+        ctx.restore();
+    }
+
+    // --- Инструменты ---
+    function setTool(tool) {
+        currentTool = tool;
+        document.querySelectorAll('.toolbar button').forEach(b => b.classList.remove('active'));
+        if(tool === 'pencil') document.getElementById('btnPencil').classList.add('active');
+        if(tool === 'eraser') document.getElementById('btnEraser').classList.add('active');
+        if(tool === 'fill') document.getElementById('btnFill').classList.add('active');
+        if(tool === 'picker') document.getElementById('btnPicker').classList.add('active');
+    }
+
+    document.getElementById('colorPicker').addEventListener('change', (e) => {
+        primaryColor = e.target.value;
+    });
+
+    // --- Логика Рисования ---
+    function getGridCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Обратное преобразование координат
+        const gridX = Math.floor((mouseX - panX) / scale);
+        const gridY = Math.floor((mouseY - panY) / scale);
+        
+        return { x: gridX, y: gridY };
+    }
+
+    function plot(x, y) {
+        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) return;
+
+        if (currentTool === 'pencil') {
+            pixels[y][x] = primaryColor;
+        } else if (currentTool === 'eraser') {
+            pixels[y][x] = null;
+        } else if (currentTool === 'picker') {
+            const c = pixels[y][x];
+            if (c) {
+                primaryColor = c;
+                document.getElementById('colorPicker').value = c;
+                setTool('pencil');
+            }
+        }
+    }
+
+    function floodFill(startX, startY, newColor) {
+        if (startX < 0 || startX >= gridWidth || startY < 0 || startY >= gridHeight) return;
+        
+        const targetColor = pixels[startY][startX];
+        if (targetColor === newColor) return; // Уже этот цвет
+
+        const stack = [[startX, startY]];
+        
+        while (stack.length) {
+            const [x, y] = stack.pop();
+            
+            if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) continue;
+            if (pixels[y][x] !== targetColor) continue;
+            
+            pixels[y][x] = newColor;
+            
+            stack.push([x + 1, y]);
+            stack.push([x - 1, y]);
+            stack.push([x, y + 1]);
+            stack.push([x, y - 1]);
+        }
+    }
+
+    // --- События мыши ---
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+            // Средняя кнопка или Shift+ЛКМ = Панорамирование
+            isPanning = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            e.preventDefault();
+            return;
+        }
+        
+        if (e.button === 0) {
+            const { x, y } = getGridCoords(e);
+            
+            if (currentTool === 'fill') {
+                if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
+                    floodFill(x, y, primaryColor);
+                    requestRender();
+                }
+            } else {
+                isDrawing = true;
+                plot(x, y);
+                requestRender();
+            }
+        }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        const { x, y } = getGridCoords(e);
+        document.getElementById('coords').innerText = `X: ${x}, Y: ${y}`;
+
+        if (isPanning) {
+            const dx = e.clientX - lastMouseX;
+            const dy = e.clientY - lastMouseY;
+            panX += dx;
+            panY += dy;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            requestRender();
+        } else if (isDrawing) {
+            plot(x, y);
+            requestRender();
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        isDrawing = false;
+        isPanning = false;
+    });
+
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        
+        const zoomSpeed = 0.1;
+        const zoomFactor = e.deltaY < 0 ? (1 + zoomSpeed) : (1 - zoomSpeed);
+        
+        // Зум в точку курсора
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const newScale = scale * zoomFactor;
+        
+        if (newScale > 0.1 && newScale < 100) {
+            panX = mouseX - (mouseX - panX) * zoomFactor;
+            panY = mouseY - (mouseY - panY) * zoomFactor;
+            scale = newScale;
+            requestRender();
+        }
+    }, { passive: false });
+
+    // Обработка пробела для панорамирования
+    let spacePressed = false;
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            spacePressed = true;
+            canvas.style.cursor = 'grab';
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+            spacePressed = false;
+            canvas.style.cursor = 'crosshair';
+            isPanning = false;
+        }
+    });
+
+
+    // --- Экспорт ---
+    function exportFile() {
+        const format = document.getElementById('exportFormat').value;
+        const fileName = `pixelart_${Date.now()}`;
+
+        if (format === 'html') {
+            exportHTML(fileName);
+        } else if (format === 'svg') {
+            exportSVG(fileName);
+        } else if (format === 'obj') {
+            exportOBJ(fileName);
+        } else {
+            // PNG, JPEG, WEBP
+            exportImage(format, fileName);
+        }
+    }
+
+    function exportImage(format, fileName) {
+        // Создаем временный canvas точного размера
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = gridWidth;
+        tempCanvas.height = gridHeight;
+        const tCtx = tempCanvas.getContext('2d');
+        
+        // Заполняем прозрачность белым, если JPEG
+        if (format === 'jpeg') {
+            tCtx.fillStyle = '#ffffff';
+            tCtx.fillRect(0,0, gridWidth, gridHeight);
+        }
+
+        pixels.forEach((row, y) => {
+            row.forEach((color, x) => {
+                if (color) {
+                    tCtx.fillStyle = color;
+                    tCtx.fillRect(x, y, 1, 1);
+                }
+            });
+        });
+
+        const link = document.createElement('a');
+        link.download = `${fileName}.${format}`;
+        link.href = tempCanvas.toDataURL(`image/${format}`);
+        link.click();
+    }
+
+    function exportSVG(fileName) {
+        let svgContent = `<svg width="${gridWidth * 10}" height="${gridHeight * 10}" viewBox="0 0 ${gridWidth} ${gridHeight}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">`;
+        // Фон (опционально)
+        // svgContent += `<rect width="${gridWidth}" height="${gridHeight}" fill="white"/>`;
+        
+        pixels.forEach((row, y) => {
+            row.forEach((color, x) => {
+                if (color) {
+                    svgContent += `<rect x="${x}" y="${y}" width="1" height="1" fill="${color}" />`;
+                }
+            });
+        });
+        svgContent += '</svg>';
+        
+        downloadString(svgContent, `${fileName}.svg`, 'image/svg+xml');
+    }
+
+    function exportHTML(fileName) {
+        let html = `<!DOCTYPE html><html><head><style>table{border-collapse:collapse;} td{width:10px;height:10px;padding:0;}</style></head><body><table>`;
+        pixels.forEach(row => {
+            html += `<tr>`;
+            row.forEach(color => {
+                html += `<td style="background-color:${color || 'transparent'}"></td>`;
+            });
+            html += `</tr>`;
+        });
+        html += `</table></body></html>`;
+        downloadString(html, `${fileName}.html`, 'text/html');
+    }
+
+    function exportOBJ(fileName) {
+        // Простой экспорт в 3D (воксели)
+        // Создает куб для каждого пикселя
+        let obj = "# Pixel Art 3D Export\n";
+        let vertCount = 0;
+        
+        pixels.forEach((row, y) => {
+            row.forEach((color, x) => {
+                if (color) {
+                    // Y в 3D обычно вверх, так что инвертируем или кладем на плоскость
+                    // Сделаем "стену" (XY плоскость)
+                    
+                    // Вершины куба
+                    // x, y inverted, 0
+                    const yInv = -y;
+                    
+                    obj += `v ${x} ${yInv} 0\n`; // 1
+                    obj += `v ${x+1} ${yInv} 0\n`; // 2
+                    obj += `v ${x+1} ${yInv-1} 0\n`; // 3
+                    obj += `v ${x} ${yInv-1} 0\n`; // 4
+                    
+                    obj += `v ${x} ${yInv} 1\n`; // 5
+                    obj += `v ${x+1} ${yInv} 1\n`; // 6
+                    obj += `v ${x+1} ${yInv-1} 1\n`; // 7
+                    obj += `v ${x} ${yInv-1} 1\n`; // 8
+
+                    // Лица (Faces)
+                    obj += `f ${vertCount+1} ${vertCount+2} ${vertCount+3} ${vertCount+4}\n`; // Front
+                    obj += `f ${vertCount+8} ${vertCount+7} ${vertCount+6} ${vertCount+5}\n`; // Back
+                    obj += `f ${vertCount+4} ${vertCount+3} ${vertCount+7} ${vertCount+8}\n`; // Top
+                    obj += `f ${vertCount+1} ${vertCount+5} ${vertCount+6} ${vertCount+2}\n`; // Bottom
+                    obj += `f ${vertCount+1} ${vertCount+4} ${vertCount+8} ${vertCount+5}\n`; // Left
+                    obj += `f ${vertCount+2} ${vertCount+6} ${vertCount+7} ${vertCount+3}\n`; // Right
+
+                    vertCount += 8;
+                }
+            });
+        });
+        
+        downloadString(obj, `${fileName}.obj`, 'text/plain');
+    }
+
+    function downloadString(text, name, type) {
+        const file = new Blob([text], {type: type});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(file);
+        a.download = name;
+        a.click();
+    }
+
+</script>
+
+</body>
+</html>

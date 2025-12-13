@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Web Editor — Monaco + Virtual FS + Tabs</title>
+
+<!-- Minimal reset + basic styling -->
+<style>
+  :root{
+    --sidebar-width: 260px;
+    --topbar-height: 40px;
+    --bg: #1e1e2a;
+    --panel: #252532;
+    --muted: #9a9ab0;
+    --accent: #0ea5a4;
+    color-scheme: dark;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:#e6e6ee;overflow:hidden}
+  .app{display:flex;height:100vh;width:100vw}
+  .sidebar{width:var(--sidebar-width);background:var(--panel);display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,0.04)}
+  .sidebar .title{height:48px;display:flex;align-items:center;padding:0 12px;font-weight:600;border-bottom:1px solid rgba(255,255,255,0.03)}
+  .fs-ops{display:flex;gap:6px;padding:8px}
+  .fs-ops button{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:6px 8px;border-radius:6px;cursor:pointer}
+  .tree{overflow:auto;padding:8px}
+  .folder, .file{padding:6px 8px;border-radius:6px;display:flex;align-items:center;gap:8px;cursor:pointer}
+  .folder:hover, .file:hover{background:rgba(255,255,255,0.02)}
+  .folder .caret{user-select:none}
+  .path{font-size:12px;color:var(--muted);padding:6px 8px;border-top:1px solid rgba(255,255,255,0.02)}
+  .main{flex:1;display:flex;flex-direction:column}
+  .topbar{height:var(--topbar-height);display:flex;align-items:center;gap:8px;padding:6px 8px;background:linear-gradient(180deg, rgba(0,0,0,0.05), transparent);border-bottom:1px solid rgba(255,255,255,0.03)}
+  .tabs{display:flex;align-items:center;gap:6px;flex:1;overflow:auto;padding:4px}
+  .tab{padding:6px 10px;border-radius:6px;background:transparent;border:1px solid transparent;display:flex;align-items:center;gap:8px}
+  .tab.active{background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-color:rgba(255,255,255,0.03)}
+  .tab .close{opacity:0.7;cursor:pointer}
+  .controls{display:flex;gap:8px;align-items:center}
+  .toggle{display:flex;align-items:center;gap:6px}
+  #editor{flex:1;position:relative}
+  .statusbar{height:28px;padding:4px 10px;border-top:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted)}
+  input[type="text"]{background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit;padding:6px;border-radius:6px}
+  .small{font-size:12px;color:var(--muted)}
+  /* Simple context menu fallback */
+  .ctx {position:absolute;background:#222228;border:1px solid rgba(255,255,255,0.05);padding:6px;border-radius:6px;z-index:9999;display:none}
+  .btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:6px 8px;border-radius:6px;color:var(--muted);cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="title">Workspace</div>
+    <div class="fs-ops">
+      <button id="newFileBtn">New File</button>
+      <button id="newFolderBtn">New Folder</button>
+      <button id="importBtn">Import</button>
+      <button id="exportBtn">Export</button>
+    </div>
+    <div class="tree" id="treeRoot" tabindex="0"></div>
+    <div class="path" id="cwdPath">/workspace</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="tabs" id="tabsBar"></div>
+      <div class="controls">
+        <div class="toggle"><label class="small">Autosave</label><input type="checkbox" id="autosave"/></div>
+        <button class="btn" id="saveBtn">Save (Ctrl+S)</button>
+        <button class="btn" id="closeAllBtn">Close All</button>
+      </div>
+    </div>
+
+    <div id="editor" role="main"></div>
+
+    <div class="statusbar" id="statusbar">
+      <div id="statusLeft">Ready</div>
+      <div id="statusRight" class="small">Ln 1, Col 1</div>
+    </div>
+  </div>
+</div>
+
+<!-- Contextual small menu -->
+<div id="ctxMenu" class="ctx"></div>
+
+<!-- Monaco loader from unpkg (uses AMD). VERSION locked to improve reliability. -->
+<script src="https://unpkg.com/monaco-editor@0.43.0/min/vs/loader.js"></script>
+
+<script>
+/*
+  Web Editor (single file)
+  - Monaco Editor integration via AMD loader
+  - Virtual file system in-memory (persisted to localStorage)
+  - Tabs with open/close, dirty marker
+  - Create/Rename/Delete files & folders
+  - Save, Autosave (toggle), keyboard shortcuts
+  - Export (download workspace JSON) and Import (restore workspace)
+*/
+
+/////////////////////
+// Utilities
+/////////////////////
+const STORAGE_KEY = 'web_editor_virtual_fs_v1';
+const TABS_STORAGE = 'web_editor_tabs_v1';
+
+function uid() { return Math.random().toString(36).slice(2,9); }
+function now() { return new Date().toISOString(); }
+
+function download(filename, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type:'application/json'}));
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/////////////////////
+// Virtual File System
+/////////////////////
+let defaultFS = {
+  '/workspace': {
+    type: 'folder',
+    children: {
+      'README.md': { type: 'file', content: '# Welcome\\nThis is a virtual workspace.\\n' },
+      'src': {
+        type: 'folder',
+        children: {
+          'index.js': { type: 'file', content: "console.log('Hello world');\\n" },
+          'App.jsx': { type: 'file', content: "// App.jsx placeholder\\n" },
+        }
+      }
+    }
+  }
+};
+
+function loadFS() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e){ console.warn('FS load failed', e); }
+  return JSON.parse(JSON.stringify(defaultFS));
+}
+function saveFS() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fs));
+  } catch(e){ console.warn('FS save failed', e); }
+}
+
+// helpers
+function splitPath(p) { return p.split('/').filter(Boolean); }
+function nodeAt(path) {
+  if (!path || path === '/') return fs;
+  const parts = splitPath(path);
+  let node = fs;
+  for (const part of parts) {
+    if (!node[part]) { // maybe top-level had key '/workspace' style
+      node = node.children?.[part] ?? null;
+    } else node = node[part];
+    if (!node) return null;
+    if (node.type === 'folder') node = node;
+  }
+  return node;
+}
+function getParent(path) {
+  const parts = splitPath(path);
+  const name = parts.pop();
+  const parentPath = '/' + parts.join('/');
+  const parent = nodeAt(parentPath) || fs;
+  return { parent, name, parentPath };
+}
+function readFile(path) {
+  const parts = splitPath(path);
+  const name = parts.pop();
+  let node = fs;
+  for (const p of parts) {
+    node = node[p]?.children ?? node.children?.[p] ?? null;
+    if (!node) return null;
+  }
+  const file = node[name] ?? node.children?.[name];
+  return file && file.type === 'file' ? file.content : null;
+}
+function writeFile(path, content) {
+  const parts = splitPath(path);
+  const filename = parts.pop();
+  let node = fs;
+  for (const p of parts) {
+    if (!node[p]) node[p] = { type:'folder', children:{} };
+    node = node[p].children;
+  }
+  node[filename] = { type:'file', content };
+  saveFS();
+}
+function ensureFolder(folderPath) {
+  const parts = splitPath(folderPath);
+  let node = fs;
+  for (const p of parts) {
+    if (!node[p]) node[p] = { type:'folder', children:{} };
+    node = node[p].children;
+  }
+  saveFS();
+}
+function deletePath(path) {
+  const { parent, name } = getParent(path);
+  if (parent.children && parent.children[name]) delete parent.children[name];
+  else if (parent[name]) delete parent[name];
+  saveFS();
+}
+function renamePath(oldPath, newName) {
+  const { parent, name } = getParent(oldPath);
+  if (!parent.children || !parent.children[name]) return false;
+  parent.children[newName] = parent.children[name];
+  delete parent.children[name];
+  saveFS();
+  return true;
+}
+
+/////////////////////
+// Render file tree
+/////////////////////
+const treeRoot = document.getElementById('treeRoot');
+function renderTree() {
+  treeRoot.innerHTML = '';
+  const root = fs['/workspace'] || fs.workspace || fs['workspace'] || fs['/'] || fs;
+  // recursive
+  function makeList(node, prefix) {
+    // node.children: object
+    const keys = Object.keys(node.children || {}).sort((a,b)=>{
+      const A = node.children[a], B = node.children[b];
+      if (A.type===B.type) return a.localeCompare(b);
+      return A.type==='folder' ? -1 : 1;
+    });
+    const container = document.createElement('div');
+    for (const key of keys) {
+      const item = node.children[key];
+      if (item.type === 'folder') {
+        const el = document.createElement('div');
+        el.className = 'folder';
+        const caret = document.createElement('span'); caret.textContent = '▸'; caret.className='caret';
+        const label = document.createElement('span'); label.textContent = key;
+        el.appendChild(caret); el.appendChild(label);
+        el.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          const path = prefix + '/' + key;
+          // toggle children visibility
+          if (el._open) {
+            el._open = false; caret.textContent='▸'; if (el._childEl) el._childEl.style.display='none';
+          } else {
+            el._open = true; caret.textContent='▾'; if (!el._childEl) {
+              const childEl = makeList(item, path);
+              childEl.style.marginLeft='14px'; el._childEl = childEl; treeRoot.insertBefore(childEl, el.nextSibling);
+            } else el._childEl.style.display='block';
+          }
+        });
+        // context menu (rename/delete)
+        el.addEventListener('contextmenu', (ev)=>{
+          ev.preventDefault(); showCtxMenu(ev.pageX, ev.pageY, [
+            {label:'New File', fn:()=>createFilePrompt(prefix + '/' + key + '/newfile.txt')},
+            {label:'New Folder', fn:()=>createFolderPrompt(prefix + '/' + key + '/newfolder')},
+            {label:'Rename', fn:()=>renamePrompt(prefix + '/' + key)},
+            {label:'Delete', fn:()=>{ if(confirm('Delete folder and all children?')){ deletePath(prefix + '/' + key); renderTree(); }}}
+          ]);
+        });
+        container.appendChild(el);
+      } else {
+        const el = document.createElement('div');
+        el.className='file';
+        el.textContent=key;
+        el.addEventListener('click', ()=>{
+          openFile(prefix + '/' + key);
+        });
+        el.addEventListener('contextmenu', (ev)=>{
+          ev.preventDefault();
+          showCtxMenu(ev.pageX, ev.pageY, [
+            {label:'Open', fn:()=>openFile(prefix + '/' + key)},
+            {label:'Rename', fn:()=>renamePrompt(prefix + '/' + key)},
+            {label:'Delete', fn:()=>{ if(confirm('Delete file?')){ deletePath(prefix + '/' + key); renderTree(); }}},
+            {label:'Download', fn:()=>{ const c = readFile(prefix + '/' + key) || ''; download(key, c); }}
+          ]);
+        });
+        container.appendChild(el);
+      }
+    }
+    return container;
+  }
+  const tree = makeList(root, '/workspace');
+  treeRoot.appendChild(tree);
+}
+
+/////////////////////
+// Tabs management & status
+/////////////////////
+let tabs = []; // {id, path, title, content, dirty, language}
+const tabsBar = document.getElementById('tabsBar');
+const statusLeft = document.getElementById('statusLeft');
+const statusRight = document.getElementById('statusRight');
+
+function saveTabsToStorage() {
+  try { localStorage.setItem(TABS_STORAGE, JSON.stringify(tabs.map(t=>({path:t.path, id:t.id})))) } catch(e){}
+}
+function renderTabs() {
+  tabsBar.innerHTML = '';
+  tabs.forEach(t=>{
+    const el = document.createElement('div');
+    el.className = 'tab' + (t.active ? ' active' : '');
+    el.dataset.id = t.id;
+    el.innerHTML = `<span style="font-size:13px">${t.title}${t.dirty? ' *' : ''}</span><span class="close" title="Close" style="margin-left:6px">✕</span>`;
+    el.querySelector('.close').addEventListener('click', (e)=>{ e.stopPropagation(); closeTab(t.id); });
+    el.addEventListener('click', ()=>{ activateTab(t.id); });
+    tabsBar.appendChild(el);
+  });
+  saveTabsToStorage();
+}
+function openFile(path) {
+  // read file content
+  const content = readFile(path);
+  if (content === null) {
+    alert('File not found or is folder.');
+    return;
+  }
+  // if already open, activate
+  const existing = tabs.find(x=>x.path===path);
+  if (existing) { activateTab(existing.id); return; }
+  const title = path.split('/').pop();
+  const id = uid();
+  const language = detectLanguageByName(title);
+  const tab = { id, path, title, content, dirty: false, language, active: true };
+  tabs.forEach(t=>t.active=false);
+  tabs.push(tab);
+  renderTabs();
+  loadTabInEditor(tab);
+  renderStatus(`Opened ${title}`);
+}
+function detectLanguageByName(name) {
+  if (!name) return 'plaintext';
+  if (name.endsWith('.js')) return 'javascript';
+  if (name.endsWith('.jsx')) return 'javascript';
+  if (name.endsWith('.ts')) return 'typescript';
+  if (name.endsWith('.tsx')) return 'typescript';
+  if (name.endsWith('.json')) return 'json';
+  if (name.endsWith('.html')) return 'html';
+  if (name.endsWith('.css')) return 'css';
+  if (name.endsWith('.md')) return 'markdown';
+  return 'plaintext';
+}
+function activateTab(id) {
+  tabs.forEach(t=>t.active = (t.id===id));
+  renderTabs();
+  const tab = tabs.find(t=>t.id===id);
+  if (tab) loadTabInEditor(tab);
+}
+function closeTab(id) {
+  const idx = tabs.findIndex(t=>t.id===id);
+  if (idx===-1) return;
+  const t = tabs[idx];
+  if (t.dirty && !confirm('Tab has unsaved changes. Close anyway?')) return;
+  tabs.splice(idx,1);
+  if (tabs.length) {
+    tabs[tabs.length-1].active = true;
+    loadTabInEditor(tabs[tabs.length-1]);
+  } else {
+    // clear editor
+    editor.setValue('');
+    currentTab = null;
+  }
+  renderTabs();
+}
+function closeAllTabs() {
+  if (tabs.some(t=>t.dirty) && !confirm('There are unsaved changes. Close all?')) return;
+  tabs = [];
+  renderTabs();
+  editor.setValue('');
+  currentTab = null;
+  renderStatus('Closed all tabs');
+}
+
+/////////////////////
+// Monaco Editor initialization (via AMD)
+/////////////////////
+let editor = null;
+let monaco = null;
+let currentTab = null;
+require.config({ paths: { 'vs': 'https://unpkg.com/monaco-editor@0.43.0/min/vs' }});
+require(['vs/editor/editor.main'], function(m){
+  monaco = m;
+  editor = monaco.editor.create(document.getElementById('editor'), {
+    value: '',
+    language: 'javascript',
+    theme: 'vs-dark',
+    automaticLayout: true,
+    minimap: { enabled: false },
+    fontSize: 14,
+  });
+
+  // keyboard shortcuts
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() { onSave(); });
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyW, function() { if(currentTab) closeTab(currentTab.id); });
+
+  editor.onDidChangeCursorPosition(e=>{
+    const pos = editor.getPosition();
+    statusRight.textContent = `Ln ${pos.lineNumber}, Col ${pos.column}`;
+  });
+  editor.onDidChangeModelContent(e=>{
+    if (!currentTab) return;
+    currentTab.content = editor.getValue();
+    // mark dirty
+    if (!currentTab.dirty) {
+      currentTab.dirty = true;
+      renderTabs();
+    }
+    if (document.getElementById('autosave').checked) {
+      onSave();
+    }
+  });
+
+  // try restore open tabs (just path list)
+  try {
+    const raw = localStorage.getItem(TABS_STORAGE);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      arr.forEach(item => {
+        const c = readFile(item.path);
+        if (c !== null) {
+          const id = uid();
+          tabs.push({ id, path: item.path, title: item.path.split('/').pop(), content: c, dirty:false, language: detectLanguageByName(item.path), active:false});
+        }
+      });
+      if (tabs.length) { tabs[0].active = true; loadTabInEditor(tabs[0]); }
+    }
+  } catch(e){}
+
+  renderTabs();
+  renderStatus('Ready — Monaco loaded');
+});
+
+function loadTabInEditor(tab) {
+  if (!editor) return;
+  currentTab = tab;
+  editor.setModel(monaco.editor.createModel(tab.content || '', tab.language));
+  renderStatus(`Editing ${tab.title}`);
+}
+
+/////////////////////
+// Save, autosave, shortcuts
+/////////////////////
+function onSave() {
+  if (!currentTab) { renderStatus('No file open'); return; }
+  writeFile(currentTab.path, editor.getValue());
+  currentTab.dirty = false;
+  currentTab.content = editor.getValue();
+  renderTabs();
+  renderStatus(`Saved ${currentTab.title} — ${new Date().toLocaleTimeString()}`);
+}
+
+document.getElementById('saveBtn').addEventListener('click', onSave);
+document.getElementById('closeAllBtn').addEventListener('click', closeAllTabs);
+
+/////////////////////
+// Create / Rename / Delete prompts
+/////////////////////
+function createFilePrompt(defaultPath) {
+  const name = prompt('New file path', defaultPath || '/workspace/newfile.txt');
+  if (!name) return;
+  const parts = splitPath(name);
+  const filename = parts.pop();
+  const folder = '/' + parts.join('/');
+  ensureFolder(folder);
+  writeFile(folder + '/' + filename, '');
+  renderTree();
+}
+function createFolderPrompt(defaultPath) {
+  const name = prompt('New folder path', defaultPath || '/workspace/newfolder');
+  if (!name) return;
+  ensureFolder(name);
+  renderTree();
+}
+function renamePrompt(path) {
+  const parts = splitPath(path);
+  const oldName = parts.pop();
+  const parent = '/' + parts.join('/');
+  const newName = prompt('New name', oldName);
+  if (!newName) return;
+  const fullOld = parent + '/' + oldName;
+  // rename
+  const { parent: parentNode } = getParent(fullOld);
+  if (parentNode.children && parentNode.children[oldName]) {
+    parentNode.children[newName] = parentNode.children[oldName];
+    delete parentNode.children[oldName];
+    saveFS();
+    renderTree();
+    renderTabs();
+  } else alert('Cannot rename');
+}
+
+/////////////////////
+// Context menu helper
+/////////////////////
+const ctxMenu = document.getElementById('ctxMenu');
+function showCtxMenu(x,y,items){
+  ctxMenu.innerHTML = '';
+  items.forEach(it=>{
+    const btn = document.createElement('div');
+    btn.textContent = it.label;
+    btn.style.padding='6px 10px';
+    btn.style.cursor='pointer';
+    btn.addEventListener('click', ()=>{
+      it.fn();
+      hideCtx();
+    });
+    btn.addEventListener('mouseover', ()=>btn.style.background='rgba(255,255,255,0.02)');
+    btn.addEventListener('mouseout', ()=>btn.style.background='transparent');
+    ctxMenu.appendChild(btn);
+  });
+  ctxMenu.style.left = x + 'px';
+  ctxMenu.style.top = y + 'px';
+  ctxMenu.style.display = 'block';
+}
+function hideCtx() { ctxMenu.style.display='none'; }
+document.addEventListener('click', hideCtx);
+
+/////////////////////
+// Export / Import workspace
+/////////////////////
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  download('workspace.json', JSON.stringify(fs, null, 2));
+});
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  const input = document.createElement('input'); input.type='file'; input.accept='.json';
+  input.onchange = (e)=>{
+    const f = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = function(){ 
+      try {
+        const j = JSON.parse(reader.result);
+        if (!j) throw new Error('Invalid');
+        fs = j;
+        saveFS();
+        renderTree();
+        alert('Workspace imported');
+      } catch(err){ alert('Import failed: ' + err.message); }
+    };
+    reader.readAsText(f);
+  };
+  input.click();
+});
+
+/////////////////////
+// New file/folder buttons
+/////////////////////
+document.getElementById('newFileBtn').addEventListener('click', ()=>createFilePrompt('/workspace/newfile.txt'));
+document.getElementById('newFolderBtn').addEventListener('click', ()=>createFolderPrompt('/workspace/newfolder'));
+
+/////////////////////
+// Status
+/////////////////////
+function renderStatus(msg) { statusLeft.textContent = msg; }
+
+/////////////////////
+// Init FS and render tree
+/////////////////////
+let fs = loadFS();
+renderTree();
+document.getElementById('cwdPath').textContent = '/workspace';
+
+// Basic global keyboard shortcuts (for page)
+document.addEventListener('keydown', (e)=>{
+  if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s') {
+    e.preventDefault(); onSave();
+  }
+  if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='w') {
+    e.preventDefault(); if(currentTab) closeTab(currentTab.id);
+  }
+});
+
+// Autosave toggle loads state from localStorage maybe
+document.getElementById('autosave').addEventListener('change', (e)=>{
+  renderStatus('Autosave ' + (e.target.checked ? 'ON' : 'OFF'));
+});
+/* restore autosave state if persisted (optional) */
+try {
+  const as = localStorage.getItem('web_editor_autosave_v1');
+  if (as) document.getElementById('autosave').checked = as === '1';
+  document.getElementById('autosave').addEventListener('change', ()=>{
+    localStorage.setItem('web_editor_autosave_v1', document.getElementById('autosave').checked ? '1' : '0');
+  });
+} catch(e){}
+
+/////////////////////
+// Save FS periodically (to persist unsaved workspace changes)
+/////////////////////
+setInterval(()=>saveFS(), 5000);
+</script>
+</body>
+</html>

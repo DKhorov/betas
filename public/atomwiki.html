@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>AtomGlide — AtomWiki</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+    :root{
+        --bg:#ffffff;
+        --muted:#6b7280;
+        --text:#111827;
+        --card:#f9fafb;
+        --accent:#111827;
+        --shadow: 0 2px 8px rgba(17,24,39,0.06);
+        --max-width: 980px;
+        --link: #2563eb;
+    }
+
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+    }
+
+    .header {
+        width:100%;
+        height: 56px;
+        background: #ffffff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 22px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 100;
+    }
+
+    .header-title {
+        font-size: 22px;
+        font-weight: bold;
+        color: var(--text);
+    }
+
+    .header-sub {
+        font-size: 14px;
+        color: var(--muted);
+        margin-left: 12px;
+        display: none; /* Скрываем на совсем малых экранах */
+    }
+    @media (min-width: 600px) { .header-sub { display: block; } }
+
+    #clock {
+        font-size: 16px;
+        font-weight: 400;
+        color: #374151;
+        margin-right: 40px;
+    }
+
+    main {
+        width: 100%;
+        max-width: var(--max-width);
+        margin: 80px auto 40px auto;
+        padding: 0 20px;
+        box-sizing: border-box;
+    }
+
+    /* Wiki Section Styles */
+    section {
+        margin-bottom: 40px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    section:last-child { border-bottom: none; }
+
+    h1 { font-size: 32px; margin-bottom: 10px; }
+    h2 { font-size: 24px; margin-top: 30px; margin-bottom: 15px; color: var(--accent); border-left: 4px solid var(--accent); padding-left: 10px; }
+    h3 { font-size: 18px; font-weight: 600; margin-top: 20px; margin-bottom: 10px; color: #374151; }
+    p { margin-bottom: 15px; color: #333; }
+    ul, ol { margin-bottom: 15px; padding-left: 25px; }
+    li { margin-bottom: 8px; }
+
+    .wiki-box {
+        background: #f3f4f6;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .wiki-info-row { display: flex; justify-content: space-between; border-bottom: 1px solid #ddd; padding: 5px 0; }
+    .wiki-info-row:last-child { border-bottom: none; }
+    .wiki-label { font-weight: bold; }
+
+    /* Table container */
+    .table-block {
+        margin-top: 20px;
+        margin-bottom: 30px;
+    }
+
+    .table-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+    }
+
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        background: white;
+        box-shadow: var(--shadow);
+        border-radius: 8px;
+        overflow: hidden;
+        font-size: 14px;
+        min-width: 600px; /* Чтобы таблицу не сплющивало сильно */
+    }
+
+    thead th {
+        background: #111827;
+        color: #fff;
+        font-weight: 600;
+        padding: 12px 14px;
+        text-align: left;
+    }
+
+    tbody td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #eee;
+        vertical-align: top;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:nth-child(odd) { background: #fbfbfb; }
+
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .toc {
+        background: #f9fafb;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        margin-bottom: 40px;
+    }
+    .toc h3 { margin-top: 0; }
+    .toc ul { list-style-type: none; padding-left: 0; columns: 2; }
+    @media (max-width: 640px) { .toc ul { columns: 1; } }
+
+    /* Footer text */
+    p#d {
+        text-align: center;
+        margin-top: 50px;
+        padding-bottom: 20px;
+        font-size: 14px;
+        color: #9ca3af;
+    }
+
+    @media (max-width: 640px) {
+        #clock { display: none; }
+        h1 { font-size: 24px; }
+        h2 { font-size: 20px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div style="display: flex; align-items: center;">
+        <div class="header-title">AtomWiki</div>
+        <div class="header-sub">Центр знаний AtomGlide</div>
+    </div>
+    <div id="clock">Загрузка...</div>
+</div>
+
+<main>
+
+    <h1>Добро пожаловать в AtomWiki</h1>
+    <p>Энциклопедия и официальная документация проекта <strong>AtomGlide</strong>.</p>
+
+    <div class="toc">
+        <h3>Содержание</h3>
+        <ul>
+            <li><a href="#about">1. Об AtomGlide</a></li>
+            <li><a href="#history">2. История проекта</a></li>
+            <li><a href="#career">3. Карьерный рост</a></li>
+            <li><a href="#staff">4. Штат и CEO</a></li>
+            <li><a href="#updates">5. Обновления</a></li>
+            <li><a href="#posts">6. Посты</a></li>
+            <li><a href="#comments">7. Комментарии</a></li>
+            <li><a href="#store">8. Магазин</a></li>
+            <li><a href="#wallet">9. Кошелек</a></li>
+            <li><a href="#messages">10. Сообщения</a></li>
+            <li><a href="#flow">11. Поток (Stream)</a></li>
+            <li><a href="#rating">12. Рейтинг</a></li>
+            <li><a href="#wiki">13. Об AtomWiki</a></li>
+            <li><a href="#services">14. Другие сервисы</a></li>
+            <li><a href="#network">15. AtomGlide Network</a></li>
+            <li><a href="#music">16. Музыка</a></li>
+            <li><a href="#rules-site">17. Правила сайта</a></li>
+            <li><a href="#rules-posts">18. Правила постов</a></li>
+            <li><a href="#rules-comments">19. Правила комментариев</a></li>
+            <li><a href="#rules-channels">20. Правила каналов</a></li>
+            <li><a href="#rules-msg">21. Правила сообщений</a></li>
+            <li><a href="#rules-tg">22. Правила Telegram</a></li>
+            <li><a href="#rules-api">23. Правила API</a></li>
+            <li><a href="#rules-respect">24. Правила уважения</a></li>
+            <li><a href="#rules-music">25. Правила музыки</a></li>
+            <li><a href="#copyright">26. Авторское право</a></li>
+            <li><a href="#bugs">27. Исправление ошибок (FAQ)</a></li>
+            <li><a href="#partners">28. Наши партнеры</a></li>
+            <li><a href="#support">29. Поддержка</a></li>
+            <li><a href="#devs">30. Разработчики</a></li>
+            <li><a href="#socials">31. Социальные сети</a></li>
+        </ul>
+    </div>
+
+    <section id="about">
+        <h2>1. Об AtomGlide</h2>
+        <div class="wiki-box" style="float: right; width: 300px; margin-left: 20px; display: none; @media(min-width:768px){display:block;}">
+            <div class="wiki-info-row"><span class="wiki-label">Тип:</span> Социальная экосистема</div>
+            <div class="wiki-info-row"><span class="wiki-label">Основана:</span> 2020 год</div>
+            <div class="wiki-info-row"><span class="wiki-label">Автор:</span> Дмитрий Контест</div>
+            <div class="wiki-info-row"><span class="wiki-label">Статус:</span> Активна</div>
+            <div class="wiki-info-row"><span class="wiki-label">Язык:</span> Русский, Английский</div>
+        </div>
+        <p><strong>AtomGlide</strong> — это многофункциональная цифровая платформа и социальная сеть нового поколения. Проект объединяет в себе возможности для общения, ведения блогов, электронной коммерции и потребления мультимедийного контента.</p>
+        <p>Основная цель AtomGlide — создание единого пространства (SuperApp), где пользователь может удовлетворить большинство своих цифровых потребностей: от чтения новостей в "Потоке" до покупки товаров в "Магазине" и прослушивания музыки.</p>
+    </section>
+
+    <section id="history">
+        <h2>2. История AtomGlide</h2>
+        <p>Проект зародился как небольшая идея по созданию удобного мессенджера. 
+        <ul>
+            <li><strong>2020:</strong> Начало разработки ядра системы (AtomCore).</li>
+            <li><strong>2021:</strong> Запуск первой бета-версии с функциями постов и профилей.</li>
+            <li><strong>2022:</strong> Глобальный редизайн, внедрение системы AtomCoin и Магазина.</li>
+            <li><strong>2024:</strong> Запуск AtomMusic и расширение API для разработчиков.</li>
+            <li><strong>2025:</strong> Старт платформы AtomWiki и интеграция нейросетевых функций.</li>
+        </ul>
+        </p>
+    </section>
+
+    <section id="career">
+        <h2>3. Карьерный рост</h2>
+        <p>В AtomGlide реализована двухуровневая система роста:</p>
+        <ol>
+            <li><strong>Пользовательский рост:</strong> Система геймификации. Активность (посты, лайки) повышает уровень профиля от "Новичка" до "Легенды". Высокий уровень открывает доступ к бета-функциям и расширенной кастомизации.</li>
+            <li><strong>Профессиональный рост:</strong> Активные участники сообщества могут стать модераторами, редакторами AtomWiki или даже присоединиться к команде разработчиков через программу стажировок AtomIntern.</li>
+        </ol>
+    </section>
+
+    <section id="staff">
+        <h2>4. Штаб сотрудников и CEO</h2>
+        <p>Команда AtomGlide распределена по всему миру, но основной штаб управления координирует работу всех сервисов.</p>
+        <ul>
+            <li><strong>CEO (Генеральный директор):</strong> Дмитрий Контест.</li>
+            <li><strong>CTO (Технический директор):</strong> Отвечает за стабильность AtomGlide Network.</li>
+            <li><strong>Head of Design:</strong> Ответственный за визуальный стиль и UI/UX.</li>
+            <li><strong>Community Lead:</strong> Управление модерацией и поддержкой.</li>
+        </ul>
+    </section>
+
+    <section id="updates">
+        <h2>5. Обновления</h2>
+        <p>AtomGlide следует философии непрерывной интеграции (CI/CD). Крупные мажорные обновления выходят раз в квартал (Spring Update, Winter Update), а мелкие патчи безопасности и фиксы — еженедельно.</p>
+        <p>Актуальная версия системы: <strong>AG 4.5.2 "Velociraptor"</strong>.</p>
+    </section>
+
+    <section id="posts">
+        <h2>6. Про посты</h2>
+        <p>Основная единица контента. Поддерживается Markdown, вставка изображений, видео, опросов и фрагментов кода. Посты могут быть публичными, приватными или доступными только подписчикам (Donut-режим).</p>
+    </section>
+
+    <section id="comments">
+        <h2>7. Про комментарии</h2>
+        <p>Древовидная система обсуждений. Комментарии поддерживают реакции (эмодзи), вложения и упоминания пользователей через символику <code>@nickname</code>.</p>
+    </section>
+
+    <section id="store">
+        <h2>8. Про магазин</h2>
+        <p>Маркетплейс цифровых и физических товаров. Пользователи могут создавать свои витрины. Официальный магазин AtomStore продает мерч, стикерпаки и премиум-подписки.</p>
+    </section>
+
+    <section id="wallet">
+        <h2>9. Про кошелек</h2>
+        <p>Внутренний финансовый инструмент. Позволяет хранить внутреннюю валюту (AtomCoin), привязывать банковские карты для оплаты подписок и осуществлять переводы между пользователями без комиссии.</p>
+    </section>
+
+    <section id="messages">
+        <h2>10. Про сообщения</h2>
+        <p>Быстрый мессенджер с поддержкой сквозного шифрования (E2EE). Возможность создания групповых чатов до 5000 человек, секретных чатов с таймером самоуничтожения и голосовых сообщений.</p>
+    </section>
+
+    <section id="flow">
+        <h2>11. Про поток (Stream)</h2>
+        <p>Умная лента новостей. Алгоритм AtomRank анализирует ваши интересы и предлагает наиболее релевантный контент от авторов, на которых вы не подписаны, но которые могут вам понравиться.</p>
+    </section>
+
+    <section id="rating">
+        <h2>12. Про рейтинг</h2>
+        <p>Цифровой показатель репутации пользователя. Складывается из кармы постов, полезности комментариев и отсутствия нарушений. Высокий рейтинг повышает видимость в "Потоке". Отрицательный рейтинг может привести к "Shadowban" (теневой блокировке).</p>
+    </section>
+
+    <section id="wiki">
+        <h2>13. Про AtomWiki</h2>
+        <p>Текущий ресурс. База знаний, наполняемая администрацией и доверенными пользователями. Цель — структурировать информацию о постоянно растущем функционале проекта.</p>
+    </section>
+
+    <section id="services">
+        <h2>14. Остальные сервисы</h2>
+        <p>В экосистему также входят: <strong>AtomDrive</strong> (облачное хранилище), <strong>AtomID</strong> (единый аккаунт авторизации) и <strong>AtomAds</strong> (рекламный кабинет).</p>
+    </section>
+
+    <section id="network">
+        <h2>15. AtomGlide Network</h2>
+        <p>Это совокупность серверов, CDN и протоколов передачи данных, обеспечивающих работу платформы. Network гарантирует доступность сервисов 99.9% времени и быструю загрузку контента в любой точке мира.</p>
+    </section>
+
+    <section id="music">
+        <h2>16. Музыка (AtomMusic)</h2>
+        <p>Стриминговый сервис внутри платформы. Миллионы треков, умные плейлисты ("Микс дня"), возможность загрузки своей музыки для независимых артистов и фоновое прослушивание.</p>
+    </section>
+
+    <section id="rules-site">
+        <h2>17. Правила сайта (Общие)</h2>
+        <p>Фундаментальные принципы нахождения на платформе:</p>
+        <ol>
+            <li>Запрещены любые нарушения законодательства РФ и международного права.</li>
+            <li>Запрещен спам, фишинг и вредоносное ПО.</li>
+            <li>Запрещена разжигание ненависти и дискриминация.</li>
+            <li>Аккаунт принадлежит пользователю, но платформа оставляет за собой право блокировки за нарушения.</li>
+        </ol>
+    </section>
+
+    <section id="rules-posts">
+        <h2>18. Правила постов</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Нарушение</th>
+                        <th>Описание</th>
+                        <th style="width: 20%;">Наказание</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>NSFW контент без тега</td>
+                        <td>Публикация контента 18+ без соответствующей маркировки.</td>
+                        <td>Бан 3 дня</td>
+                    </tr>
+                    <tr>
+                        <td>Кликбейт</td>
+                        <td>Заголовки, намеренно вводящие в заблуждение.</td>
+                        <td>Понижение в выдаче</td>
+                    </tr>
+                    <tr>
+                        <td>Шок-контент</td>
+                        <td>Сцены жестокости, насилия.</td>
+                        <td>Удаление + Бан 7 дней</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="rules-comments">
+        <h2>19. Правила комментариев</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Нарушение</th>
+                        <th>Описание</th>
+                        <th style="width: 20%;">Наказание</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Оскорбления</td>
+                        <td>Прямые оскорбления личности собеседника.</td>
+                        <td>Мут (RO) 24 часа</td>
+                    </tr>
+                    <tr>
+                        <td>Оффтоп</td>
+                        <td>Массовые комментарии не по теме поста.</td>
+                        <td>Удаление ветки</td>
+                    </tr>
+                    <tr>
+                        <td>Реклама</td>
+                        <td>Несогласованные ссылки на сторонние ресурсы.</td>
+                        <td>Мут 7 дней</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="rules-channels">
+        <h2>20. Правила каналов</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Нарушение</th>
+                        <th>Описание</th>
+                        <th style="width: 20%;">Наказание</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Нарушение тематики</td>
+                        <td>Резкая смена темы канала для обмана подписчиков.</td>
+                        <td>Блокировка канала</td>
+                    </tr>
+                    <tr>
+                        <td>Массовый пинг</td>
+                        <td>Злоупотребление упоминанием @all без важной причины.</td>
+                        <td>Отключение уведомлений</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="rules-msg">
+        <h2>21. Правила сообщений</h2>
+        <p>Личная переписка неприкосновенна (тайну переписки гарантирует AtomGlide), однако:</p>
+        <ul>
+            <li>Запрещена массовая рассылка (спам) в ЛС.</li>
+            <li>Запрещены угрозы жизни и здоровью.</li>
+            <li>При жалобе пользователя модератор имеет право проверить <strong>конкретное</strong> сообщение, на которое подана жалоба.</li>
+        </ul>
+    </section>
+
+    <section id="rules-tg">
+        <h2>22. Правила в Telegram канале и группах</h2>
+        <p>В официальных чатах AtomGlide в Telegram действуют те же нормы этикета. Запрещен флуд, гифки с эпилепсией, попрошайничество и обсуждение политики.</p>
+    </section>
+
+    <section id="rules-api">
+        <h2>23. Правила работы с API</h2>
+        <ul>
+            <li>Лимит запросов: не более 5 запросов в секунду (для Free Tier).</li>
+            <li>Обязательное указание User-Agent вашего приложения.</li>
+            <li>Запрещено использовать API для скрапинга личных данных пользователей.</li>
+            <li>Токены доступа не должны передаваться третьим лицам.</li>
+        </ul>
+    </section>
+
+    <section id="rules-respect">
+        <h2>24. Правила уважения</h2>
+        <p>AtomGlide — это сообщество людей. Мы требуем:</p>
+        <ul>
+            <li>Уважать чужое мнение, даже если оно отличается от вашего.</li>
+            <li>Не переходить на личности в спорах.</li>
+            <li>Использовать конструктивную критику вместо токсичности.</li>
+        </ul>
+    </section>
+
+    <section id="rules-music">
+        <h2>25. Правила музыки</h2>
+        <p>При загрузке треков в AtomMusic:</p>
+        <ul>
+            <li>Загружаемый файл должен быть в высоком качестве (mp3 320kbps / flac).</li>
+            <li>Запрещена загрузка экстремистских материалов в аудиоформате.</li>
+            <li>Обложка трека не должна содержать порнографии.</li>
+        </ul>
+    </section>
+
+    <section id="copyright">
+        <h2>26. Авторское право</h2>
+        <p>AtomGlide соблюдает DMCA и локальные законы об авторском праве. Если вы обнаружили свой контент, размещенный без разрешения, используйте форму <code>/copyright-claim</code>. Мы удаляем пиратский контент в течение 24 часов после проверки заявки.</p>
+    </section>
+
+    <section id="bugs">
+        <h2>27. Исправление ошибок (FAQ / Troubleshooting)</h2>
+        <p>Таблица известных проблем и их быстрых решений.</p>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">№</th>
+                        <th>Проблема / Ошибка</th>
+                        <th>Решение</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>1</td><td>Ошибка входа 401</td><td>Проверьте правильность пароля или сбросьте его.</td></tr>
+                    <tr><td>2</td><td>Не грузятся аватарки</td><td>Очистите кэш браузера (Ctrl+F5).</td></tr>
+                    <tr><td>3</td><td>"Server Error 500"</td><td>Временный сбой. Попробуйте через 5 минут.</td></tr>
+                    <tr><td>4</td><td>Не приходит SMS код</td><td>Проверьте папку "Спам" или смените оператора.</td></tr>
+                    <tr><td>5</td><td>Музыка прерывается</td><td>Проверьте стабильность интернета / отключите VPN.</td></tr>
+                    <tr><td>6</td><td>Приложение вылетает (iOS)</td><td>Обновите приложение до последней версии в Store.</td></tr>
+                    <tr><td>7</td><td>Сообщение не отправлено</td><td>Вы в черном списке у пользователя или нет сети.</td></tr>
+                    <tr><td>8</td><td>Ошибка API: Rate Limit</td><td>Уменьшите частоту запросов вашего бота.</td></tr>
+                    <tr><td>9</td><td>Черный экран при запуске</td><td>Переустановите приложение.</td></tr>
+                    <tr><td>10</td><td>Не работает оплата картой</td><td>Проверьте лимиты на интернет-покупки в банке.</td></tr>
+                    <tr><td>11</td><td>Уведомления не приходят</td><td>Разрешите уведомления в настройках телефона.</td></tr>
+                    <tr><td>12</td><td>Видео тормозит</td><td>Снизьте качество видео в плеере (на "Auto").</td></tr>
+                    <tr><td>13</td><td>Не меняется никнейм</td><td>Никнейм можно менять раз в 30 дней.</td></tr>
+                    <tr><td>14</td><td>Ошибка загрузки файла</td><td>Файл превышает лимит (100 Мб) или неверный формат.</td></tr>
+                    <tr><td>15</td><td>Двойное списание денег</td><td>Напишите в Поддержку с чеком операции.</td></tr>
+                    <tr><td>16</td><td>Пропали переписки</td><td>Возможно, вы зашли во второй аккаунт. Проверьте ID.</td></tr>
+                    <tr><td>17</td><td>Голосовые не слышно</td><td>Проверьте разрешение на использование микрофона.</td></tr>
+                    <tr><td>18</td><td>Долгая буферизация</td><td>Слабый сигнал Wi-Fi. Переключитесь на 4G.</td></tr>
+                    <tr><td>19</td><td>Ошибка "User not found"</td><td>Пользователь удалил аккаунт или сменил ссылку.</td></tr>
+                    <tr><td>20</td><td>Смайлики отображаются квадратами</td><td>Обновите ОС вашего устройства.</td></tr>
+                    <tr><td>21</td><td>Не работает темная тема</td><td>Переключите тумблер в настройках "Интерфейс".</td></tr>
+                    <tr><td>22</td><td>Бан без причины</td><td>Подайте апелляцию через бота поддержки.</td></tr>
+                    <tr><td>23</td><td>Зависает лента "Поток"</td><td>Очистите кэш приложения в настройках AtomGlide.</td></tr>
+                    <tr><td>24</td><td>Ошибка привязки почты</td><td>Почта уже используется в другом аккаунте.</td></tr>
+                    <tr><td>25</td><td>Не работает поиск</td><td>Попробуйте изменить поисковый запрос (опечатки).</td></tr>
+                    <tr><td>26</td><td>Качество фото падает</td><td>Отключите "Экономию трафика" в настройках.</td></tr>
+                    <tr><td>27</td><td>2FA не работает</td><td>Синхронизируйте время в Google Authenticator.</td></tr>
+                    <tr><td>28</td><td>Виджет не обновляется</td><td>Удалите и добавьте виджет на экран заново.</td></tr>
+                    <tr><td>29</td><td>История поиска не чистится</td><td>Нажмите "Очистить все" в настройках конфиденциальности.</td></tr>
+                    <tr><td>30</td><td>Звук отстает от видео</td><td>Перезагрузите страницу или приложение.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="partners">
+        <h2>28. Наши партнеры</h2>
+        <p>Мы сотрудничаем с ведущими технологическими компаниями, платежными шлюзами и музыкальными лейблами для обеспечения лучшего сервиса.</p>
+    </section>
+
+    <section id="support">
+        <h2>29. Поддержка</h2>
+        <p>Служба заботы о клиентах работает 24/7. 
+        <br>Email: <code>support@atomglide.com</code>
+        <br>Бот в Telegram: <code>@AtomSupportBot</code></p>
+    </section>
+
+    <section id="devs">
+        <h2>30. Разработчики</h2>
+        <p>Портал для девелоперов: <code>dev.atomglide.com</code>. Там вы найдете документацию по API, SDK и примеры кода на Python, JS и Go.</p>
+    </section>
+
+    <section id="socials">
+        <h2>31. Актуальные соцсети</h2>
+        <ul>
+            <li><strong>Telegram канал:</strong> t.me/atomglide_news</li>
+            <li><strong>YouTube:</strong> AtomGlide Official</li>
+            <li><strong>VK:</strong> vk.com/atomglide</li>
+        </ul>
+    </section>
+
+</main>
+
+<p id="d">(c) Дмитрий Контест 2025</p>
+
+<script>
+function updateClock() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    document.getElementById('clock').textContent =
+        `${hours}:${minutes}:${seconds} ${day}.${month}.${year}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+</script>
+
+</body>
+</html>

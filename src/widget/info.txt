@@ -1,0 +1,10 @@
+Folder: widget
+Files: 3
+
+index.jsx - 8.80 KB
+setting.jsx - 9.43 KB
+widget.jsx - 4.77 KB
+
+Author: Dmitry Khorov
+Telegram: @dkdevelop @jpegweb
+DK Studio Production

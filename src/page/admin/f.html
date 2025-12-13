@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1000x1000 Перетаскиваемая Ферма (Ванильный JS)</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+            text-align: center;
+        }
+
+        /* Контейнер, который ограничивает видимость карты */
+        #viewport {
+            overflow: hidden; 
+            border: 8px solid #4a2b16; 
+            position: relative;
+            touch-action: none; 
+            user-select: none; 
+            margin: 20px auto;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+            background-color: #38761D; 
+        }
+
+        /* Сетка, которая содержит все клетки */
+        #mapGrid {
+            display: grid;
+            position: absolute;
+            top: 0;
+            left: 0;
+            will-change: transform; 
+            image-rendering: pixelated; 
+        }
+
+        /* Стилизация одной клетки */
+        .cell {
+            width: 32px;
+            height: 32px;
+            box-sizing: border-box;
+            border: 1px dotted rgba(0, 0, 0, 0.1);
+        }
+
+        /* Типы клеток */
+        .soil {
+            background-color: #795548;
+        }
+
+        .water {
+            background-color: #008cba;
+        }
+
+        .path {
+            background-color: #c9ac8c; 
+        }
+        
+        .house {
+            background-color: #e6b8af; 
+            position: relative;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <h1>Перетаскиваемая Ферма (Ванильный JS)</h1>
+    <p>Нажмите и удерживайте левую кнопку мыши, чтобы перемещать карту 1000x1000.</p>
+    
+    <div id="viewport">
+        <div id="mapGrid">
+            </div>
+    </div>
+
+    <script>
+        // --- КОНСТАНТЫ КАРТЫ ---
+        const MAP_SIZE = 1000;      // Размер карты (клеток)
+        const CELL_SIZE = 32;       // Размер одной клетки в пикселях
+        const VIEWPORT_SIZE = 15;   // Видимая область (15x15 клеток)
+        
+        const TOTAL_WIDTH = MAP_SIZE * CELL_SIZE;     
+        const VIEWPORT_PIXELS = VIEWPORT_SIZE * CELL_SIZE; 
+
+        // DOM-элементы
+        const viewport = document.getElementById('viewport');
+        const mapGrid = document.getElementById('mapGrid');
+        
+        // --- СОСТОЯНИЕ ---
+        let offset = { x: 0, y: 0 };
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let mapData = []; // Данные о всех 1 000 000 клетках
+
+        // --- 1. НАСТРОЙКА DOM и ДАННЫХ ---
+        function setupMap() {
+            // Установка размеров viewport
+            viewport.style.width = `${VIEWPORT_PIXELS}px`;
+            viewport.style.height = `${VIEWPORT_PIXELS}px`;
+            
+            // Установка размеров и структуры mapGrid
+            mapGrid.style.width = `${TOTAL_WIDTH}px`;
+            mapGrid.style.height = `${TOTAL_WIDTH}px`;
+            mapGrid.style.gridTemplateColumns = `repeat(${MAP_SIZE}, ${CELL_SIZE}px)`;
+
+            // Генерация данных (1000x1000)
+            for (let i = 0; i < MAP_SIZE; i++) {
+                for (let j = 0; j < MAP_SIZE; j++) {
+                    let type = 'soil';
+                    
+                    // Домик в левом верхнем углу
+                    if (i < 4 && j < 4) {
+                        type = 'house'; 
+                    } 
+                    // Тропинка
+                    else if ((i === 5 && j < 10) || (j === 10 && i < 10)) {
+                        type = 'path';
+                    }
+                    // Случайная вода/почва
+                    else if (Math.random() > 0.98) {
+                        type = 'water';
+                    }
+
+                    mapData.push({
+                        id: `${i}-${j}`,
+                        type: type,
+                        x: j, // Столбец
+                        y: i, // Строка
+                    });
+                }
+            }
+            // Изначальный рендеринг видимой области
+            renderVisibleCells();
+        }
+
+        // --- 2. ЛОГИКА ВИРТУАЛИЗАЦИИ И РЕНДЕРИНГА ---
+        function renderVisibleCells() {
+            // 1. Определение границ видимости
+            const startCol = Math.max(0, Math.floor(-offset.x / CELL_SIZE));
+            const startRow = Math.max(0, Math.floor(-offset.y / CELL_SIZE));
+            
+            const endCol = Math.min(MAP_SIZE, startCol + VIEWPORT_SIZE);
+            const endRow = Math.min(MAP_SIZE, startRow + VIEWPORT_SIZE);
+
+            // 2. Очистка mapGrid перед рендерингом новых клеток
+            mapGrid.innerHTML = '';
+            
+            // 3. Создание и добавление только видимых клеток
+            for (let i = startRow; i < endRow; i++) {
+                for (let j = startCol; j < endCol; j++) {
+                    // Формула для поиска индекса в одномерном массиве: y * MAP_SIZE + x
+                    const index = i * MAP_SIZE + j;
+                    const cellData = mapData[index];
+
+                    const cellElement = document.createElement('div');
+                    cellElement.className = `cell ${cellData.type}`;
+                    cellElement.id = cellData.id; 
+                    
+                    // Позиционируем клетку внутри большой сетки (1000x1000)
+                    cellElement.style.gridRowStart = i + 1; // CSS Grid начинается с 1
+                    cellElement.style.gridColumnStart = j + 1;
+
+                    mapGrid.appendChild(cellElement);
+                }
+            }
+            
+            // 4. Применение смещения к mapGrid
+            mapGrid.style.transform = `translate(${offset.x}px, ${offset.y}px)`;
+        }
+
+
+        // --- 3. ЛОГИКА ПЕРЕТАСКИВАНИЯ ---
+        
+        function handleMouseDown(e) {
+            e.preventDefault();
+            isDragging = true;
+            dragStart = { x: e.clientX, y: e.clientY };
+            viewport.style.cursor = 'grabbing';
+
+            // Добавляем глобальные слушатели
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+
+        function handleMouseMove(e) {
+            if (!isDragging) return;
+            
+            const dx = e.clientX - dragStart.x;
+            const dy = e.clientY - dragStart.y;
+
+            let newX = offset.x + dx;
+            let newY = offset.y + dy;
+            
+            // Ограничение смещения 
+            const maxOffset = TOTAL_WIDTH - VIEWPORT_PIXELS;
+            
+            newX = Math.min(0, Math.max(-maxOffset, newX));
+            newY = Math.min(0, Math.max(-maxOffset, newY));
+
+            offset = { x: newX, y: newY };
+            
+            // Обновляем начальные координаты для следующего кадра
+            dragStart = { x: e.clientX, y: e.clientY };
+            
+            // Вызываем перерисовку видимой области и смещение
+            renderVisibleCells();
+        }
+
+        function handleMouseUp() {
+            isDragging = false;
+            viewport.style.cursor = 'grab';
+            
+            // Удаляем глобальные слушатели
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        }
+
+        // --- ЗАПУСК ---
+        viewport.addEventListener('mousedown', handleMouseDown);
+        viewport.style.cursor = 'grab';
+
+        // Запуск инициализации карты после загрузки DOM
+        document.addEventListener('DOMContentLoaded', setupMap);
+
+    </script>
+</body>
+</html>
