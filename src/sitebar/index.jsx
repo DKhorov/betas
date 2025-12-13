@@ -149,7 +149,7 @@ const Sitebar = () => {
           sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}
         >
           <StoreIcon style={{ width: 30, height: 30 }} />
-          {!isSmallMobile && <span style={{ fontWeight: 800, fontSize: '20px', color: '#fff' }}>Atom</span>}
+          {!isSmallMobile && <span style={{ fontWeight: 800, fontSize: '20px', color: '#fff' }}>Atom 13 Beta </span>}
         </Box>
 
         {/* Поиск (Только десктоп) */}
@@ -298,7 +298,7 @@ const Sitebar = () => {
                 sx={{ bgcolor: INPUT_BG_COLOR, input: { color: '#fff' }, label: { color: '#aaa' } }} 
             />
             <TextField 
-                label="Жанр" name="genre" value={trackData.genre} onChange={handleInputChange} fullWidth required
+                label="автор" name="genre" value={trackData.genre} onChange={handleInputChange} fullWidth required
                 variant="filled" 
                 sx={{ bgcolor: INPUT_BG_COLOR, input: { color: '#fff' }, label: { color: '#aaa' } }} 
             />
