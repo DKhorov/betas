@@ -39,14 +39,7 @@ const WidgetMain = React.memo(() => {
     fetchChannels();
   }, []);
 
-  // Если юзер не залогинен
-  if (!user) {
-    return (
-      <Box sx={{ width: 280, color: 'white', p: 2 }}>
-        <Typography>Вы не авторизованы</Typography>
-      </Box>
-    );
-  }
+
 
   return (
     <Box
@@ -110,36 +103,6 @@ const WidgetMain = React.memo(() => {
         </Button>
       </Box>
 
-      {/* 🎬 ВИДЕО ЭЛЕМЕНТ ДЛЯ ТЕСТА */}
-      <Box
-        sx={{
-          width: '100%',
-          backgroundColor: "vvar(--theme-surface)",
-          border: "1px solid var(--theme-border)",
-          borderRadius: "var(--border-radius-main)",
-          p: 1, 
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <video 
-          src={videoUrl} 
-          style={{ 
-            width: '100%', 
-            maxHeight: '200px', 
-            borderRadius: 'var(--border-radius-main)',
-          }}
-          controls
-          loop
-          muted
-          autoPlay
-          
-          playsInline
-        >
-          Ваш браузер не поддерживает видео HTML5.
-        </video>
-      </Box>
       {/* 🎬 КОНЕЦ ВИДЕО ЭЛЕМЕНТА */}
 <div className="sidebar-promo2 with-image">
     <div className="image-wrapper" style={{ position: "relative", width: "100%", height: "100%" }}>

@@ -129,8 +129,8 @@ const Panel = React.memo(() => {
             style={{ width: "100%", height: "100%", borderRadius: "8px", display: "block", objectFit: "cover" }}
         />
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px", background: "linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0))", color: "white", borderRadius: "0 0 8px 8px" }}>
-            <h4 style={{ margin: 0 }}>AtomGlide 13 Beta 1</h4>
-            <p style={{ margin: 0 }}>Первый бета тест 13 Beta 1 !!</p>
+            <h4 style={{ margin: 0 }}>AtomGlide 13 Beta 2</h4>
+            <p style={{ margin: 0 }}>Первый бета тест 13 Beta 2 !!</p>
         </div>
     </div>
 </div>

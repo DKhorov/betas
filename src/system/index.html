@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <style>
+        /* =======================================
+           1. СИСТЕМА ТЕМ (CSS-ПЕРЕМЕННЫЕ)
+           ======================================= */
+        :root {
+            /* Определение переменных для светлой темы по умолчанию */
+            --color-main-bg: white;
+            --color-main-fg: black;
+            --color-npc-face: black;
+            --color-npc-features: white;
+            --color-accent: orange;
+            --color-button-bg: rgb(230, 230, 230); /* Светло-серый фон кнопок */
+            --color-button-fg: black;              /* Черный текст кнопок */
+            --color-button-hover: rgb(200, 200, 200); /* Фон кнопок при наведении */
+        }
+
+        /* Тёмная тема */
+        .dark {
+            --color-main-bg: rgb(46, 46, 46);
+            --color-main-fg: white;
+            --color-npc-face: rgb(255, 255, 255);
+            --color-npc-features: rgb(0, 0, 0);
+            --color-button-bg: rgb(65, 65, 65);     /* Темно-серый фон кнопок */
+            --color-button-fg: white;               /* Белый текст кнопок */
+            --color-button-hover: rgb(90, 90, 90);  /* Фон кнопок при наведении */
+        }
+
+        /* Светлая тема */
+        .light {
+            --color-main-bg: white;
+            --color-main-fg: black;
+            --color-npc-face: rgb(0, 0, 0);
+            --color-npc-features: white;
+            /* Остальные переменные остаются как в :root */
+        }
+
+        /* =======================================
+           2. ГЛАВНЫЕ СТИЛИ (ИСПОЛЬЗУЕМ ПЕРЕМЕННЫЕ)
+           ======================================= */
+        body {
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.3s, color 0.3s;
+            font-family: "Poppins", sans-serif;
+            background-color: var(--color-main-bg);
+            color: var(--color-main-fg);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+        }
+
+        .icon-btn {
+            font-size: 28px;
+            cursor: pointer;
+            transition: color 0.3s;
+            color: var(--color-main-fg);
+        }
+
+        main {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: calc(100vh - 80px); 
+        }
+
+        /* NPC Стили */
+        .npc {
+            width: 110px;
+            height: 190px;
+            border-radius: 100px;
+            transition: background-color 0.3s;
+            background-color: var(--color-npc-face);
+            margin-bottom: 25px; 
+        }
+
+        .down {
+            display: flex;
+            justify-content: center;
+        }
+
+        .name {
+            position: fixed;
+            bottom: 0;
+            margin-bottom: 20px;
+            font-weight: 300;
+            color: var(--color-main-fg);
+        }
+
+        /* Стили для элементов NPC (Глаза и Рот) */
+        .npc-eye1 {
+            width: 18px;
+            height: 35px;
+            border-radius: 100px;
+            transition: background-color 0.3s;
+            background-color: var(--color-npc-features);
+            transition: height 0.3s;
+        }
+
+        .npc-eye {
+            display: flex;
+            justify-content: space-evenly;
+            margin-top: 40px;
+        }
+
+        .npc-smile {
+            width: 60px;
+            height: 4px;
+            border-radius: 100px;
+            margin-top: 10px;
+            transition: height 0.3s;
+            background-color: var(--color-npc-features);
+        }
+
+        /* Стили для бокового меню */
+        .menu{
+            width: 300px;
+            height: 90vh;
+            background-color: rgb(36, 35, 35);
+            border-radius: 10px;
+            position: fixed;
+            top: 0;
+            margin-left: 20px;
+            margin-top: 20px;
+            left: 0;
+            transition: left 0.3s;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+        
+        /* =======================================
+           3. СТИЛИ ДЛЯ КНОПОК В ЛЕВОМ ВЕРХНЕМ УГЛУ
+           ======================================= */
+        .top-left-menu {
+            position: fixed;
+            top: 15px; /* Отступ от верхнего края */
+            left: 15px; /* Отступ от левого края */
+            display: flex;
+            flex-direction: column; /* Располагаем ряды кнопок вертикально */
+            z-index: 10; /* Убеждаемся, что кнопки поверх других элементов */
+        }
+        
+        .npc-buttons,
+        .npc-buttons-row2 {
+            display: flex; /* Кнопки в ряду горизонтально */
+            width: 300px; /* Фиксируем ширину для лучшего вида */
+            margin: 0; /* Удаляем margin-top, так как управляем им через gap */
+            margin-bottom: 10px; /* Отступ между рядами */
+            gap: 10px; 
+        }
+
+        .npc-button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: "Poppins", sans-serif;
+            font-weight: 500;
+            transition: background-color 0.2s, transform 0.1s;
+            flex-grow: 1; /* Кнопки будут заполнять доступное пространство */
+            text-align: center;
+            
+            background-color: var(--color-button-bg);
+            color: var(--color-button-fg);
+        }
+
+        .npc-button:hover {
+            background-color: var(--color-button-hover);
+        }
+        
+        /* Стили для иконок в кнопках */
+        .npc-button i {
+            margin-right: 5px;
+        }
+
+
+        /* Стили для текстового эффекта */
+        .typewriter {
+            font-family: 'Poppins', sans-serif;
+            color: black;
+            text-align: center;
+            border-right: 2px solid var(--color-main-fg);
+            transition: border-right-color 0.3s;
+        }
+    
+
+    </style>
+    <script>
+        const text = "Девочка, а ты учишь Python?";
+        const speed = 120;
+        const cursorChar = "│";
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const el = document.getElementById("type");
+            let i = 0;
+            let showingCursor = true;
+
+            if (!el) return;
+
+            function type() {
+                if (i <= text.length) {
+                    el.textContent = text.slice(0, i) + (showingCursor ? " " + cursorChar : "");
+                    i++;
+                    setTimeout(type, speed);
+                } else {
+                    blinkCursor();
+                }
+            }
+
+            function blinkCursor() {
+                setInterval(() => {
+                    showingCursor = !showingCursor;
+                    el.textContent = text + (showingCursor ? " " + cursorChar : "");
+                }, 500);
+            }
+
+            // Добавляем класс typewriter для корректного отображения курсора
+            el.classList.add('typewriter');
+            type();
+        });
+    </script>
+</head>
+<body class="dark">
+    <header>
+        <i class="fa-solid fa-bars icon-btn"></i>
+        <i class="fa-solid fa-sun icon-btn theme-toggle"></i>
+    </header>
+    
+ 
+
+
+    <main>
+        <div style="margin-bottom: 20px;">
+            <h2  style="margin-bottom: 0;">Тестовый текст</h3>
+            <h4 style="margin-top: 0; text-align: center;">Тестовый текст</h5>
+        </div>
+
+        <div class="npc">
+           <div class="npc-eye">
+             <div class="npc-eye1" id="ed"></div>
+             <div class="npc-eye1" id="ed1"></div>
+           </div>
+           <div style="display: flex;justify-content: center;">
+             <div class="npc-smile" id="smile"></div>
+           </div>
+        </div>
+   
+    </main>
+
+    <div class="down">
+        <h4 class="name">
+            Intel Atom M200 • 64mb RAM • 1gb HDD
+        </h4>
+    </div>
+
+    <div class="menu" style="display: none;">
+      <h1 style="margin-left: 30px;">Geromik</h1>
+      <div>
+       <h3 style="margin-left: 30px;margin-top: 20px;margin-bottom: 5px;">Health </h3>
+<div style="
+    width: 220px;
+    border: solid white 2px;
+    height: 20px;
+    margin-left: 30px;
+    padding: 2px; 
+    border-radius: 100px;
+">
+    <div style="
+        width: 30%;
+        background-color: white;
+        border-radius: 100px;
+        height: 100%;
+    "></div>
+</div>
+<h3 style="margin-left: 30px;margin-top: 20px;margin-bottom: 5px;">CPU Speed </h3>
+<div style="
+    width: 220px;
+    border: solid white 2px;
+    height: 20px;
+    margin-left: 30px;
+    padding: 2px; 
+        border-radius: 100px;
+
+">
+    <div style="
+        width: 60%;
+        background-color: rgb(176, 103, 8);
+        height: 100%;
+    border-radius: 100px;
+    "></div>
+</div>
+       <h3 style="margin-left: 30px;margin-top: 20px;margin-bottom: 5px;">RAM load (512mb)</h3>
+<div style="
+    width: 220px;
+    border: solid white 2px;
+    height: 20px;
+    margin-left: 30px;
+    padding: 2px; 
+        border-radius: 100px;
+
+">
+    <div style="
+        width: 30%;
+        background-color: white;
+        height: 100%;
+    border-radius: 100px;
+    "></div>
+</div>
+       <h3 style="margin-left: 30px;margin-top: 20px;margin-bottom: 5px;">HDD load (32gb) </h3>
+<div style="
+    width: 220px;
+    border: solid white 2px;
+    height: 20px;
+    margin-left: 30px;
+    padding: 2px; 
+        border-radius: 100px;
+
+">
+    <div style="
+        width: 30%;
+        background-color: white;
+        height: 100%;
+    border-radius: 100px;
+    "></div>
+</div>
+        </div>
+      </div>
+    </div>
+
+
+    <script>
+        // ===============================================
+        // ПЕРЕКЛЮЧЕНИЕ ТЕМЫ (НЕ ИЗМЕНЕНО)
+        // ===============================================
+        const themeBtn = document.querySelector('.theme-toggle');
+        const body = document.body;
+
+        // При загрузке страницы проверяем, какой класс установлен и устанавливаем иконку
+        if (body.classList.contains('dark')) {
+            themeBtn.classList.add('fa-sun');
+        } else {
+            themeBtn.classList.add('fa-moon');
+        }
+
+        themeBtn.addEventListener('click', () => {
+            // Переключаем классы
+            body.classList.toggle('light');
+            body.classList.toggle('dark');
+
+            // Переключаем иконку
+            if (body.classList.contains('dark')) {
+                themeBtn.classList.remove('fa-moon');
+                themeBtn.classList.add('fa-sun');
+            } else {
+                themeBtn.classList.remove('fa-sun');
+                themeBtn.classList.add('fa-moon');
+            }
+        });
+
+        // ===============================================
+        // АНИМАЦИИ NPC (НЕ ИЗМЕНЕНО)
+        // ===============================================
+
+        // Функция-имитатор sleep, которая возвращает Promise
+        function sleep(ms) {
+            return new Promise(resolve => {
+                setTimeout(resolve, ms);
+            });
+        }
+
+        async function animateHeight() {
+            const element = document.getElementById('ed');
+            if (!element) return; 
+
+            element.style.height = '34px'; 
+            await sleep(500); 
+            element.style.height = '20px';
+            await sleep(3000); 
+            element.style.height = '34px'; 
+        }
+
+        async function animateHeight2() {
+            const element1 = document.getElementById('ed1');
+            if (!element1) return;
+
+            element1.style.height = '34px'; 
+            await sleep(500); 
+            element1.style.height = '20px';
+            await sleep(3000); 
+            element1.style.height = '34px'; 
+        }
+
+        async function animateHeight3() {
+            const element2 = document.getElementById('smile');
+            if (!element2) return;
+
+            element2.style.height = '4px'; 
+            element2.style.width = '60px'; 
+            await sleep(500); 
+
+            element2.style.height = '50px'; 
+            element2.style.width = '20px'; 
+            await sleep(3000); 
+            
+            element2.style.height = '4px'; 
+            element2.style.width = '60px'; 
+        }
+
+        async function tappleEye() {
+            const wq = document.getElementById('ed1');        
+            const ww = document.getElementById('ed');
+
+            if (!wq || !ww) return;
+            
+            while (true) {
+                wq.style.height = '34px'; 
+                ww.style.height = '34px'; 
+                
+                const randomWaitTime = Math.floor(Math.random() * 3000) + 3000;
+                await sleep(randomWaitTime); // Использование случайного времени
+
+                wq.style.height = '5px'; 
+                ww.style.height = '5px'; 
+                
+                await sleep(200); 
+            }
+        }
+
+
+        async function initializeAnimations() {
+            await Promise.all([
+                animateHeight(),
+                animateHeight2(),
+                animateHeight3()
+            ]);
+            
+            console.log("Основная анимация завершена. Запускаем моргание...");
+
+            tappleEye();
+        }
+
+        // Запускаем главный оркестратор
+        document.addEventListener('DOMContentLoaded', () => {
+             initializeAnimations();
+        });
+
+    </script>
+</body>
+</html>

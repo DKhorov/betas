@@ -12,7 +12,7 @@ import Panel from '../widget/panel';
 import axios from "./axios.js";
 import { lazyRetry } from '../utils/lazyRetry';
 
-// Lazy-loaded routes
+const Gemini = React.lazy(() => lazyRetry(() => import('../page/gemini/index.jsx')));
 const Main = React.lazy(() => lazyRetry(() => import('../page/main/main')));
 const Store = React.lazy(() => lazyRetry(() => import('../page/apps/store.jsx')));
 const AtomsClicker = React.lazy(() => lazyRetry(() => import('../page/apps/game.jsx')));
@@ -140,6 +140,8 @@ const AppRouter = () => {
                 <Route path="/music" element={<Music/>} />                              
                 <Route path="/post/:id" element={<FullPost />} />
                 <Route path="/search" element={<SearchPage />} />
+                                <Route path="/geromik" element={<Gemini />} />
+
                 <Route path="*" element={<Main />} />
               </>
             )}
