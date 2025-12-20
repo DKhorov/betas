@@ -227,7 +227,11 @@ const Sitebar = () => {
             <TbMusicPlus size={22} />
           </IconButton>
 
-        
+          {isMobile && (
+            <IconButton onClick={toggleMenu}>
+              {isOpen ? <CloseIcon /> : <MenuIcon />}
+            </IconButton>
+          )}
 
       
         </Box>
@@ -431,6 +435,7 @@ const Sitebar = () => {
             if (newPost?._id) navigate(`/post/${newPost._id}`);
           }}
         />
+      
       )}
     </Box>
   );
