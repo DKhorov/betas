@@ -1,26 +1,20 @@
-import React, { useState } from 'react';
-import {
-  Box,
-  IconButton,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Alert,
-  useMediaQuery,
-} from "@mui/material";
+import React, { useState, useMemo } from 'react';
+import { 
+  Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery,
+  Box, TextField, Button, IconButton, Typography, Alert, Fade, Avatar
+} from '@mui/material';
 
+// MUI Иконки
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-
-// Иконки
-import { TbMusicPlus } from "react-icons/tb";
-import { FaWallet } from "react-icons/fa";
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
+import MusicNoteIcon from '@mui/icons-material/MusicNote';
+
+// React Icons
+import { TbMusicPlus } from "react-icons/tb";
+import { FaWallet } from "react-icons/fa";
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -31,12 +25,50 @@ import { selectUser } from '../system/redux/slices/getme';
 import { ReactComponent as StoreIcon } from './14.svg';
 import PostCreatorModal from '../page/main/PostCreator';
 
-// Переменные для фона
-// Если вы используете переменные CSS (var(--bg-secondary)), они должны быть определены глобально.
-// Здесь я использую явные значения из вашего кода, где это возможно.
-const BACKGROUND_COLOR = 'rgba(14, 17, 22, 1)'; // Основной фон
-const DIALOG_BG_COLOR = 'var(--bg-secondary, #1e2126)'; // Фон модалок
-const INPUT_BG_COLOR = '#2e3238'; // Фон полей ввода
+// Константы стилей
+const ACCENT_COLOR = 'rgb(237, 93, 25)';
+const BACKGROUND_COLOR = 'rgba(14, 17, 22, 1)';
+const DIALOG_BG = '#121212';
+const INPUT_BG = 'rgba(255, 255, 255, 0.03)';
+const BORDER_COLOR = 'rgba(255, 255, 255, 0.08)';
+
+// Вспомогательный компонент для красивых полей ввода
+const CustomTextField = ({ label, ...props }) => (
+  <TextField
+    {...props}
+    fullWidth
+    label={label}
+    variant="standard"
+    InputLabelProps={{ 
+      shrink: true, 
+      sx: { 
+        color: ACCENT_COLOR, 
+        fontWeight: 600, 
+        fontSize: '14px',
+        '&.Mui-focused': { color: ACCENT_COLOR }
+      } 
+    }}
+    InputProps={{
+      disableUnderline: true,
+      sx: {
+        color: '#fff',
+        bgcolor: INPUT_BG,
+        borderRadius: '14px',
+        px: 2,
+        py: 0.8,
+        mt: '22px !important',
+        border: '1px solid rgba(255,255,255,0.1)',
+        transition: 'all 0.2s ease-in-out',
+        '&:hover': { bgcolor: 'rgba(255,255,255,0.06)' },
+        '&.Mui-focused': {
+          border: `1px solid ${ACCENT_COLOR}`,
+          bgcolor: 'rgba(0,0,0,0.3)',
+          boxShadow: `0 0 0 4px rgba(237, 93, 25, 0.1)`
+        }
+      }
+    }}
+  />
+);
 
 const Sitebar = () => {
   const isMobile = useMediaQuery('(max-width:900px)');
@@ -80,12 +112,15 @@ const Sitebar = () => {
   };
 
   const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
+    if (e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+      setUploadError("");
+    }
   };
 
   const handleUpload = async () => {
     if (!selectedFile || !trackData.title.trim() || !trackData.genre.trim()) {
-      setUploadError("Заполните все обязательные поля и выберите файл!");
+      setUploadError("Заполните название, жанр и выберите файл!");
       return;
     }
 
@@ -121,6 +156,8 @@ const Sitebar = () => {
     { label: 'Сообщения', href: '/message' },
     { label: 'Профиль', href: user ? `/account/${user.id || user._id}` : '#' },
     { label: 'Настройки', href: '/settings' },
+        { label: 'Geromik', href: '/geromik' },
+
   ];
 
   const handleNavigation = (href, label) => {
@@ -140,7 +177,7 @@ const Sitebar = () => {
         justifyContent: 'space-between', 
         alignItems: 'center', 
         p: isMobile ? '8px 15px' : '10px 24px',
-        borderBottom: '1px solid #2e3238'
+        borderBottom: `1px solid ${BORDER_COLOR}`
       }}>
         
         {/* Логотип */}
@@ -149,14 +186,13 @@ const Sitebar = () => {
           sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}
         >
           <StoreIcon style={{ width: 30, height: 30 }} />
-          {!isSmallMobile && <span style={{ fontWeight: 800, fontSize: '20px', color: '#fff' }}>Atom 13 Beta </span>}
+          {!isSmallMobile && <span style={{ fontWeight: 800, fontSize: '20px', color: '#fff', letterSpacing: '-0.5px' }}>Atom</span>}
         </Box>
 
-        {/* Поиск (Только десктоп) */}
+        {/* Поиск (Десктоп) */}
         {!isMobile && (
-          <Box sx={{ flexGrow: 1, maxWidth: '500px', mx: 4 }}>
+          <Box sx={{ flexGrow: 1, maxWidth: '500px', mx: 4, position: 'relative' }}>
              <input 
-              className="search-input-desktop"
               type="text" 
               placeholder="Поиск..." 
               value={searchQuery}
@@ -164,12 +200,13 @@ const Sitebar = () => {
               onKeyPress={handleSearch}
               style={{
                 width: '100%',
-                padding: '10px 15px',
-                borderRadius: '20px',
-                border: 'none',
-                backgroundColor: INPUT_BG_COLOR,
+                padding: '10px 18px',
+                borderRadius: '14px',
+                border: '1px solid rgba(255,255,255,0.05)',
+                backgroundColor: 'rgba(255,255,255,0.05)',
                 color: '#fff',
-                outline: 'none'
+                outline: 'none',
+                fontSize: '14px'
               }}
             />
           </Box>
@@ -178,61 +215,57 @@ const Sitebar = () => {
         {/* Кнопки действий */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '12px' }}>
           
-          <IconButton onClick={() => setOpenPostCreator(true)} sx={{ color: '#fff' }}>
+          <IconButton 
+            onClick={() => setOpenPostCreator(true)} 
+            sx={{ color: '#fff', '&:hover': { color: ACCENT_COLOR } }}
+          >
             <AddIcon />
-            {/* На мобилках можно сделать кнопку "Создать" с текстом, если есть место */}
-            {!isMobile && <span style={{ fontSize: '14px', marginLeft: '5px' }}>Создать</span>}
+            {!isMobile && <Typography sx={{ fontSize: '14px', ml: 1, fontWeight: 500 }}>Создать</Typography>}
           </IconButton>
           
-          {/* Кнопка Загрузить музыку - теперь всегда видима на мобилке */}
-          <IconButton onClick={handleOpenUpload} sx={{ color: '#fff' }}>
+          <IconButton onClick={handleOpenUpload} sx={{ color: '#fff', '&:hover': { color: ACCENT_COLOR } }}>
             <TbMusicPlus size={22} />
           </IconButton>
 
-          <IconButton onClick={() => navigate('/wallet')} sx={{ color: '#fff' }}>
-            <FaWallet size={20} />
-          </IconButton>
+        
 
-          {isMobile && (
-            <IconButton onClick={toggleMenu} sx={{ color: '#fff', ml: 1 }}>
-              {isOpen ? <CloseIcon /> : <MenuIcon />}
-            </IconButton>
-          )}
-
-          {!isMobile && (
-             <Box 
-                onClick={() => handleNavigation(user ? `/account/${user.id || user._id}` : '/', 'Профиль')}
-                sx={{ width: 35, height: 35, borderRadius: '50%', bgcolor: '#333', cursor: 'pointer', overflow: 'hidden' }}
-             >
-                {/* Аватарка здесь */}
-             </Box>
-          )}
+      
         </Box>
       </Box>
 
-      {/* ВТОРАЯ ПАНЕЛЬ (Только десктоп) */}
+      {/* ВТОРАЯ ПАНЕЛЬ (Десктоп) */}
       {!isMobile && (
-        <Box sx={{ display: 'flex', gap: 3, px: 3, py: 1, overflowX: 'auto', whiteSpace: 'nowrap', borderTop: '1px solid #2e3238' }}>
+        <Box sx={{ 
+          display: 'flex', gap: 2 ,px: 3, py: 1.5, 
+          overflowX: 'auto', whiteSpace: 'nowrap',
+          borderTop: `1px solid rgba(255,255,255,0.02)` 
+        }}>
           {menuItems.map((item) => (
-            <Box
+            <Typography
               key={item.label}
               onClick={() => handleNavigation(item.href, item.label)}
-              sx={{ color: '#aaa', fontSize: '14px', cursor: 'pointer', '&:hover': { color: '#fff' } }}
+              sx={{ 
+                color: '#888', 
+                fontSize: '17px', 
+                fontWeight: 500,
+                cursor: 'pointer', 
+                transition: '0.2s',
+                '&:hover': { color: '#fff' } 
+              }}
             >
               {item.label}
-            </Box>
+            </Typography>
           ))}
         </Box>
       )}
 
-      {/* МОБИЛЬНОЕ МЕНЮ (Full Screen Overlay) */}
+      {/* МОБИЛЬНОЕ МЕНЮ */}
       <AnimatePresence>
         {isMobile && isOpen && (
           <motion.div
-            initial={{ opacity: 0, x: '100%' }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: '100%' }}
-            transition={{ duration: 0.3 }}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
             style={{
               position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh',
               backgroundColor: BACKGROUND_COLOR, zIndex: 2000, padding: '20px', display: 'flex', flexDirection: 'column'
@@ -242,86 +275,148 @@ const Sitebar = () => {
               <IconButton onClick={toggleMenu} sx={{ color: '#fff' }}><CloseIcon fontSize="large" /></IconButton>
             </Box>
 
-            {/* Поиск внутри мобильного меню */}
-            <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+            <Box sx={{ display: 'flex', gap: 1, mb: 4 }}>
                 <input 
-                    type="text" 
-                    placeholder="Поиск..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={handleSearch}
+                    type="text" placeholder="Поиск..." 
+                    value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyPress={handleSearch}
                     style={{
                         flexGrow: 1, padding: '15px', borderRadius: '12px', border: 'none',
-                        backgroundColor: INPUT_BG_COLOR, color: '#fff', fontSize: '18px', outline: 'none'
+                        backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '16px', outline: 'none'
                     }}
                 />
-                <IconButton onClick={handleSearch} sx={{ color: '#fff', bgcolor: '#ed5d19', borderRadius: '12px' }}>
+                <IconButton onClick={handleSearch} sx={{ color: '#fff', bgcolor: ACCENT_COLOR, borderRadius: '12px', '&:hover': { bgcolor: '#d44d15' } }}>
                     <SearchIcon />
                 </IconButton>
             </Box>
 
             <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
               {menuItems.map((item) => (
-                <Box
+                <Typography
                   key={item.label}
                   onClick={() => handleNavigation(item.href, item.label)}
                   sx={{ 
-                    color: '#fff', fontSize: '24px', fontWeight: 700, py: 2, 
-                    borderBottom: '1px solid #111', cursor: 'pointer' 
+                    color: '#fff', fontSize: '26px', fontWeight: 700, py: 2, 
+                    borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer',
+                    letterSpacing: '-1px'
                   }}
                 >
                   {item.label}
-                </Box>
+                </Typography>
               ))}
             </Box>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ДИАЛОГ ЗАГРУЗКИ ТРЕКА */}
-      <Dialog open={openUpload} onClose={handleClose} fullWidth maxWidth="sm" 
-        PaperProps={{ sx: { bgcolor: DIALOG_BG_COLOR, color: '#fff' } }}
+      {/* КРАСИВЫЙ ДИАЛОГ ЗАГРУЗКИ ТРЕКА */}
+      <Dialog 
+        open={openUpload} 
+        onClose={handleClose} 
+        fullWidth 
+        maxWidth="sm"
+        TransitionComponent={Fade}
+        transitionDuration={400}
+        PaperProps={{
+          sx: {
+            bgcolor: DIALOG_BG,
+            backgroundImage: 'none',
+            borderRadius: '28px',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.8)',
+            border: `1px solid ${BORDER_COLOR}`,
+            overflow: 'hidden'
+          }
+        }}
       >
-        <DialogTitle 
-          sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: DIALOG_BG_COLOR }}
-        >
-          Загрузить новый трек
-          <IconButton onClick={handleClose} sx={{ color: '#fff' }}><CloseIcon /></IconButton>
+        <DialogTitle sx={{ 
+          m: 0, p: 3, 
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          borderBottom: '1px solid rgba(255,255,255,0.05)'
+        }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: '-0.5px', color: '#fff' }}>
+            Загрузить трек
+          </Typography>
+          <IconButton onClick={handleClose} sx={{ color: '#555', '&:hover': { color: '#fff' } }}>
+            <CloseIcon />
+          </IconButton>
         </DialogTitle>
-        <DialogContent dividers sx={{ bgcolor: DIALOG_BG_COLOR, borderColor: '#333' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            {uploadError && <Alert severity="error" sx={{ bgcolor: '#2c0000', color: '#ffbaba' }}>{uploadError}</Alert>}
-            
-            <TextField 
-                label="Название трека" name="title" value={trackData.title} onChange={handleInputChange} fullWidth required
-                variant="filled" 
-                sx={{ bgcolor: INPUT_BG_COLOR, input: { color: '#fff' }, label: { color: '#aaa' } }} 
-            />
-            <TextField 
-                label="автор" name="genre" value={trackData.genre} onChange={handleInputChange} fullWidth required
-                variant="filled" 
-                sx={{ bgcolor: INPUT_BG_COLOR, input: { color: '#fff' }, label: { color: '#aaa' } }} 
-            />
-            <TextField 
-                label="Ссылка на обложку (URL)" name="cover" value={trackData.cover} onChange={handleInputChange} fullWidth
-                variant="filled" 
-                sx={{ bgcolor: INPUT_BG_COLOR, input: { color: '#fff' }, label: { color: '#aaa' } }} 
-            />
-            
-            <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />} 
-                sx={{ py: 2, borderColor: '#444', color: '#fff', height: 50 }}
+
+        <DialogContent sx={{ p: 4 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3.5, mt: 1 }}>
+            {uploadError && (
+              <Alert severity="error" variant="filled" sx={{ borderRadius: '14px', fontSize: '14px' }}>
+                {uploadError}
+              </Alert>
+            )}
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3,mt:1 }}>
+              <CustomTextField 
+                label="Название трека" name="title" placeholder="I'm still standing"
+                value={trackData.title} onChange={handleInputChange} 
+              />
+              <CustomTextField 
+                label="Автор трека (группа)" name="genre" placeholder="Queen,Elton John, Imagine Dragons..."
+                value={trackData.genre} onChange={handleInputChange} 
+              />
+              <CustomTextField 
+                label="URL ОБЛОЖКИ (ОПЦИОНАЛЬНО)" name="cover" placeholder="https://..."
+                value={trackData.cover} onChange={handleInputChange} 
+              />
+            </Box>
+
+            <Button
+              variant="outlined"
+              component="label"
+              sx={{
+                mt: 1, py: 4,
+                display: 'flex', flexDirection: 'column', gap: 1.5,
+                borderRadius: '20px',
+                border: `2px dashed ${selectedFile ? ACCENT_COLOR : 'rgba(255,255,255,0.1)'}`,
+                bgcolor: selectedFile ? 'rgba(237, 93, 25, 0.04)' : INPUT_BG,
+                color: selectedFile ? '#fff' : '#666',
+                transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                textTransform: 'none',
+                '&:hover': {
+                  borderColor: ACCENT_COLOR,
+                  bgcolor: 'rgba(237, 93, 25, 0.08)',
+                  transform: 'translateY(-2px)'
+                }
+              }}
             >
-              {selectedFile ? selectedFile.name : "Выбрать MP3 файл"}
+              {selectedFile ? (
+                <>
+                  <MusicNoteIcon sx={{ fontSize: 44, color: ACCENT_COLOR }} />
+                  <Typography sx={{ fontWeight: 600, color: '#fff' }}>{selectedFile.name}</Typography>
+                  <Typography variant="caption" sx={{ color: ACCENT_COLOR }}>Файл готов к загрузке</Typography>
+                </>
+              ) : (
+                <>
+                  <CloudUploadIcon sx={{ fontSize: 44, mb: 0.5, opacity: 0.5 }} />
+                  <Typography sx={{ fontSize: '16px', fontWeight: 600 }}>Выберите аудиофайл</Typography>
+                  <Typography variant="caption">MP3 до 10мб</Typography>
+                </>
+              )}
               <input type="file" hidden accept="audio/*" onChange={handleFileChange} />
             </Button>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ bgcolor: DIALOG_BG_COLOR, p: 2 }}>
-          <Button onClick={handleClose} sx={{ color: '#aaa' }}>Отмена</Button>
-          <Button onClick={handleUpload} variant="contained" disabled={uploading} 
-            sx={{ bgcolor: 'rgb(237,93,25)', '&:hover': { bgcolor: '#d44d15' }, borderRadius: '50px', px: 4, color: 'white' }}
+
+        <DialogActions sx={{ p: 3, pt: 1, justifyContent: 'space-between' }}>
+          <Button onClick={handleClose} sx={{ color: '#666', fontWeight: 600, '&:hover': { color: '#fff' } }}>
+            Отмена
+          </Button>
+          <Button 
+            onClick={handleUpload} 
+            variant="contained" 
+            disabled={uploading || !selectedFile}
+            sx={{ 
+              bgcolor: ACCENT_COLOR, px: 6, py: 1.4, borderRadius: '50px',
+              fontWeight: 700, fontSize: '15px', textTransform: 'none',
+              boxShadow: `0 10px 25px rgba(237, 93, 25, 0.3)`,
+              '&:hover': { bgcolor: '#d44d15', boxShadow: `0 12px 30px rgba(237, 93, 25, 0.5)` },
+              '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: '#444' }
+            }}
           >
-            {uploading ? "Загрузка..." : "Опубликовать"}
+            {uploading ? "Загрузка..." : "Опубликовать трек"}
           </Button>
         </DialogActions>
       </Dialog>
