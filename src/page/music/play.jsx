@@ -160,13 +160,6 @@ const FullPlayer = ({
             <CloseIcon sx={{ fontSize: "2rem", color: "white" }} />
           </IconButton>
 
-          <IconButton onClick={() => setShowLyrics(!showLyrics)}>
-            {showLyrics ? (
-              <ImageIcon sx={{ color: "white" }} />
-            ) : (
-              <LyricsIcon sx={{ color: "white" }} />
-            )}
-          </IconButton>
         </Box>
 
         {/* ЦЕНТРАЛЬНАЯ ОБЛАСТЬ */}
