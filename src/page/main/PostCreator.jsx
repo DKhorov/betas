@@ -9,25 +9,32 @@ import {
   Modal,
   useMediaQuery,
   useTheme,
-  Slider,
   Tabs,
-  Tab
+  Tab,
+  Fade,
+  Avatar,
+  Divider,
+  CircularProgress,
 } from "@mui/material";
-import { FiImage, FiSmile, FiGitPullRequest, FiMaximize, FiX, FiVideo } from "react-icons/fi";
+import { 
+  FiImage, FiSmile, FiX, FiVideo, FiHash, 
+  FiCheckCircle, FiAlertCircle, FiChevronDown 
+} from "react-icons/fi";
 import { IoMdSend } from "react-icons/io";
-import { customIcons } from "../../components/icon";
+import { motion, AnimatePresence } from "framer-motion";
 import axios from "../../system/axios";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
 
-} from '@mui/material';
+// Константы стилей
+const ACCENT_COLOR = 'rgb(237, 93, 25)';
+const BG_DARK = '#0a0a0a';
+const BG_PANEL = 'rgba(20, 20, 20, 0.7)';
+const BORDER_STYLE = '1px solid rgba(255, 255, 255, 0.08)';
+
 const PostCreatorModal = ({ open: externalOpen, onClose: externalOnClose, onPostCreated }) => {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = externalOpen !== undefined ? externalOnClose : setInternalOpen;
+  
   const [inputText, setInputText] = useState("");
   const [showMediaUpload, setShowMediaUpload] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState(null);
@@ -38,14 +45,11 @@ const PostCreatorModal = ({ open: externalOpen, onClose: externalOnClose, onPost
   const [loading, setLoading] = useState(false);
   const [channels, setChannels] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState("");
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showFullscreenEditor, setShowFullscreenEditor] = useState(false);
   const [uploadTab, setUploadTab] = useState(0);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const fileInputRef = useRef(null);
-  const videoRef = useRef(null);
 
   useEffect(() => {
     const fetchChannels = async () => {
@@ -54,475 +58,246 @@ const PostCreatorModal = ({ open: externalOpen, onClose: externalOnClose, onPost
         const res = await axios.get("/channels/my", {
           headers: { Authorization: `Bearer ${token}` },
         });
-
         if (Array.isArray(res.data)) {
           setChannels(res.data);
-          if (res.data.length > 0) {
-            setSelectedChannel(res.data[0]._id);
-          }
+          if (res.data.length > 0) setSelectedChannel(res.data[0]._id);
         }
-      } catch (err) {
-        console.error("Ошибка загрузки каналов:", err);
-      }
+      } catch (err) { console.error("Ошибка загрузки каналов:", err); }
     };
-
-    if (open) {
-      fetchChannels();
-    }
+    if (open) fetchChannels();
   }, [open]);
 
-  const handleSendPost = async () => {
-    if (!selectedChannel) {
-      setError("Выберите канал для публикации");
-      return;
-    }
-
-    if (mediaType === 'video' && videoDuration > 30) {
-      setError("Видео не должно превышать 30 секунд");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const token = localStorage.getItem("token");
-      const formData = new FormData();
-
-      formData.append("title", inputText.trim());
-      formData.append("channelId", selectedChannel);
-      if (selectedMedia) {
-        formData.append("media", selectedMedia);
-        if (mediaType === 'video') {
-          formData.append("videoDuration", Math.floor(videoDuration));
-        }
-      }
-
-      const res = await axios.post("/posts", formData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (onPostCreated && res.data) {
-        onPostCreated(res.data);
-      }
-
-      setInputText("");
-      setSelectedMedia(null);
-      if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
-      setMediaPreviewUrl(null);
-      setShowMediaUpload(false);
-      setVideoDuration(0);
-      setMediaType('image');
-      setOpen(false);
-    } catch (err) {
-      console.error("Ошибка при создании поста:", err);
-      setError(err.response?.data?.error || "Не удалось создать пост");
-    }
-
-    setLoading(false);
-  };
-
   const handleMediaChange = (e) => {
-    if (e.target.files?.[0]) {
-      const file = e.target.files[0];
+    const file = e.target.files?.[0];
+    if (file) {
       const isVideo = file.type.startsWith('video/');
-      
       setSelectedMedia(file);
       setMediaType(isVideo ? 'video' : 'image');
-      
       if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
       setMediaPreviewUrl(URL.createObjectURL(file));
       
       if (isVideo) {
         const video = document.createElement('video');
         video.preload = 'metadata';
-        video.onloadedmetadata = () => {
-          setVideoDuration(video.duration);
-          URL.revokeObjectURL(video.src);
-        };
+        video.onloadedmetadata = () => { setVideoDuration(video.duration); URL.revokeObjectURL(video.src); };
         video.src = URL.createObjectURL(file);
       }
     }
   };
 
-  const autoGrow = (el) => {
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height =
-      Math.min(el.scrollHeight, window.innerHeight * 0.6) + "px";
-  };
-
   const handleClose = () => {
-    if (externalOnClose) {
-      externalOnClose();
-    } else {
-      setInternalOpen(false);
-    }
+    if (externalOnClose) externalOnClose(); else setInternalOpen(false);
     setInputText("");
     setSelectedMedia(null);
     if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
     setMediaPreviewUrl(null);
     setShowMediaUpload(false);
-    setVideoDuration(0);
-    setMediaType('image');
     setError("");
   };
 
+  const handleSendPost = async () => {
+    if (!selectedChannel) return setError("Выберите канал");
+    if (mediaType === 'video' && videoDuration > 30) return setError("Видео слишком длинное");
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("title", inputText.trim());
+      formData.append("channelId", selectedChannel);
+      if (selectedMedia) {
+        formData.append("media", selectedMedia);
+        if (mediaType === 'video') formData.append("videoDuration", Math.floor(videoDuration));
+      }
+      const res = await axios.post("/posts", formData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (onPostCreated) onPostCreated(res.data);
+      handleClose();
+    } catch (err) {
+      setError(err.response?.data?.error || "Ошибка создания");
+    } finally { setLoading(false); }
+  };
+
   return (
-    <>
-     
-      <Modal
-        open={open}
-        onClose={handleClose}
-        sx={{
+    <Modal
+      open={open}
+      onClose={handleClose}
+      closeAfterTransition
+      sx={{ display: "flex", alignItems: "center", justifyContent: "center", p: isMobile ? 0 : 2 }}
+    >
+      <Fade in={open}>
+        <Box sx={{
+          width: isMobile ? "100%" : "640px",
+          height: isMobile ? "100%" : "auto",
+          maxHeight: isMobile ? "100%" : "90vh",
+          bgcolor: BG_DARK,
+          borderRadius: isMobile ? 0 : "32px",
+          border: BORDER_STYLE,
+          boxShadow: '0 30px 70px rgba(0,0,0,0.8)',
+          overflow: "hidden",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          p: isMobile ? 0 : 2,
-        }}
-      >
-        <Box
-          sx={{
-            width: isMobile ? "100%" : "600px",
-            height: isMobile ? "100vh" : "90vh",
-            borderRadius: isMobile ? 0 : "10px",
-            backgroundColor: "rgba(10, 10, 10, 1)",
-            border: "2px solid rgb(34,34,34)",
-            p: "15px 20px",
-            overflow: "auto",
-            position: "relative",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-           <Typography
-                    sx={{ color: "rgba(129, 129, 129, 1)", fontSize: "18px",mt:0.5 }}
-                  >
-                    Мастер создания постов
-                  </Typography>
-          <IconButton
-            onClick={handleClose}
-            sx={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              color: "rgba(154,153,153,1)",
-              zIndex: 10,
-            }}
-          >
-            <FiX size={20} />
-          </IconButton>
-
-  <Box
-  sx={{
-    display: "flex",
-    alignItems: "flex-start",
-    backgroundColor: "rgba(17, 17, 17, 1)",
-    border: "1px solid rgb(34,34,34)",
-    borderRadius: "10px",
-    p: "8px",
-    mt: 2,
-    height: "200px", 
-  }}
->
-  <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mr: 1 }}>
-    <IconButton
-      size="small"
-      onClick={() => setShowMediaUpload((prev) => !prev)}
-      sx={{
-        color: showMediaUpload
-          ? "rgba(126,126,126,1)"
-          : "rgba(154,153,153,1)",
-      }}
-    >
-      <FiImage size={18} />
-    </IconButton>
-    <IconButton
-      size="small"
-      onClick={() => { setShowMediaUpload(true); setUploadTab(1); }}
-      sx={{ color: "rgba(154,153,153,1)" }}
-    >
-      <FiVideo size={18} />
-    </IconButton>
-    <IconButton
-      size="small"
-      onClick={() => setShowEmojiPicker(true)}
-      sx={{ color: "rgba(154,153,153,1)" }}
-    >
-      <FiSmile size={18} />
-    </IconButton>
-  </Box>
-
-  <textarea
-    value={inputText}
-    onChange={(e) => {
-      setInputText(e.target.value);
-      autoGrow(e.target);
-    }}
-    placeholder="Что у тебя нового?"
-    rows={3}
-    style={{
-      flex: 1,
-      border: "none",
-      outline: "none",
-      fontSize: "15px",
-      color: "rgba(255,255,255,0.9)",
-      backgroundColor: "transparent",
-      padding: "6px",
-      resize: "none",
-      overflowY: "auto", 
-      height: "100%", 
-      maxHeight: "100%", 
-    }}
-    onInput={(e) => autoGrow(e.target)}
-  />
-
-  <IconButton
-    size="small"
-    onClick={handleSendPost}
-    disabled={loading || channels.length === 0}
-    sx={{
-      color:
-        channels.length === 0
-          ? "rgba(100,100,100,0.6)"
-          : "rgba(154,153,153,1)",
-    }}
-  >
-    {loading ? "..." : <IoMdSend size={22} />}
-  </IconButton>
-</Box>
-
-
-
-          {showMediaUpload && (
-            <Box sx={{ mt: 2 }}>
-              <Tabs 
-                value={uploadTab} 
-                onChange={(e, v) => setUploadTab(v)}
-                sx={{ 
-                  mb: 2,
-                  '& .MuiTab-root': { color: '#888', minWidth: 80 },
-                  '& .Mui-selected': { color: 'rgb(237,93,25)' },
-                  '& .MuiTabs-indicator': { backgroundColor: 'rgb(237,93,25)' }
-                }}
-              >
-                <Tab label="Фото" icon={<FiImage />} iconPosition="start" />
-                <Tab label="Видео" icon={<FiVideo />} iconPosition="start" />
-              </Tabs>
-              
-              <Box
-                sx={{
-                  p: 2,
-                  border: "2px dashed #555",
-                  borderRadius: "8px",
-                  textAlign: "center",
-                  cursor: "pointer",
-                }}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={uploadTab === 0 ? "image/*" : "video/mp4,video/webm,video/quicktime"}
-                  style={{ display: "none" }}
-                  onChange={handleMediaChange}
-                />
-                {selectedMedia ? (
-                  <Box>
-                    {mediaType === 'video' ? (
-                      <>
-                        <video
-                          ref={videoRef}
-                          src={mediaPreviewUrl}
-                          style={{
-                            maxWidth: "100%",
-                            maxHeight: "200px",
-                            borderRadius: "8px",
-                          }}
-                          controls
-                        />
-                        <Box sx={{ mt: 2, px: 2 }}>
-                          <Typography sx={{ color: '#888', fontSize: '13px', mb: 1 }}>
-                            Длительность: {Math.floor(videoDuration)} сек {videoDuration > 30 && <span style={{color: 'red'}}>(макс 30 сек!)</span>}
-                          </Typography>
-                          {videoDuration > 30 && (
-                            <Typography sx={{ color: 'red', fontSize: '12px' }}>
-                              Видео слишком длинное. Загрузите видео до 30 секунд.
-                            </Typography>
-                          )}
-                        </Box>
-                      </>
-                    ) : (
-                      <img
-                        src={mediaPreviewUrl}
-                        alt="preview"
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "160px",
-                          borderRadius: "8px",
-                        }}
-                      />
-                    )}
-                    <Typography sx={{ fontSize: "13px", color: "#1976d2", mt: 1 }}>
-                      {selectedMedia.name}
-                    </Typography>
-                  </Box>
-                ) : (
-                  <Box>
-                    {uploadTab === 0 ? <FiImage size={32} color="#666" /> : <FiVideo size={32} color="#666" />}
-                    <Typography sx={{ color: "#888", fontSize: "15px", mt: 1 }}>
-                      {uploadTab === 0 ? "Перетащите фото или выберите его" : "Загрузите видео (до 30 сек)"}
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
+          flexDirection: "column",
+          position: "relative"
+        }}>
+          
+          {/* HEADER */}
+          <Box sx={{ p: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ bgcolor: ACCENT_COLOR, p: 1, borderRadius: '12px', display: 'flex' }}>
+                    <FiHash color="white" size={18} />
+                </Box>
+                <Typography variant="h6" sx={{ color: "white", fontWeight: 700, letterSpacing: '-0.5px' }}>
+                    Новая публикация
+                </Typography>
             </Box>
-          )}
-
-          <Box
-            sx={{
-              mt: 2,
-              p: 1.5,
-              borderRadius: "8px",
-              background: "rgba(30,30,30,0.8)",
-              border: "1px solid rgba(70,70,70,0.6)",
-            }}
-          >
-            <Typography sx={{ fontSize: "12px", color: "rgba(200,200,200,0.9)" }}>
-              Создавая пост, вы соглашаетесь с{" "}
-              <span style={{ color: "#ffffffff", cursor: "pointer" }}>
-                правилами публикации AtomGlide
-              </span>
-              . Запрещены оскорбления, спам и NSFW-контент.
-            </Typography>
+            <IconButton onClick={handleClose} sx={{ color: "rgba(255,255,255,0.3)", '&:hover': { color: '#fff' } }}>
+              <FiX size={22} />
+            </IconButton>
           </Box>
 
-          <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
-            <Typography
-              sx={{
-                color: "rgba(186, 186, 186, 1)",
-                fontSize: "12px",
-                mr: 1,
+          <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+
+          {/* CONTENT AREA */}
+          <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
+            
+            {/* Текстовая область */}
+            <textarea
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Расскажите что-нибудь..."
+              style={{
+                width: '100%',
+                minHeight: '120px',
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                color: 'white',
+                fontSize: '18px',
+                fontFamily: 'inherit',
+                resize: 'none',
+                lineHeight: 1.5
               }}
-            >
-              Канал:
-            </Typography>
-            <Select
-              value={selectedChannel}
-              onChange={(e) => setSelectedChannel(e.target.value)}
-              size="small"
-              sx={{
-                fontSize: "12px",
-                color: "white",
-                backgroundColor: "rgba(34,34,34,1)",
-                borderRadius: "6px",
-                height: "28px",
-                "& .MuiSelect-icon": { color: "gray" },
-              }}
-            >
-              {channels.length === 0 ? (
-                <MenuItem disabled>Нет каналов</MenuItem>
-              ) : (
-                channels.map((ch) => (
-                  <MenuItem key={ch._id} value={ch._id}>
-                    {ch.nick || ch.name}
-                  </MenuItem>
-                ))
+            />
+
+            {/* ПРЕДПРОСМОТР МЕДИА */}
+            <AnimatePresence mode="wait">
+              {mediaPreviewUrl && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  style={{ position: 'relative', marginTop: '20px', borderRadius: '20px', overflow: 'hidden' }}
+                >
+                  <IconButton
+                    onClick={() => { setSelectedMedia(null); setMediaPreviewUrl(null); }}
+                    sx={{ position: 'absolute', top: 10, right: 10, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', zIndex: 5, '&:hover': { bgcolor: '#f44336' } }}
+                  >
+                    <FiX size={16} />
+                  </IconButton>
+                  {mediaType === 'video' ? (
+                    <Box>
+                      <video src={mediaPreviewUrl} style={{ width: '100%', borderRadius: '20px', display: 'block' }} controls />
+                      <Box sx={{ position: 'absolute', bottom: 15, left: 15, bgcolor: 'rgba(0,0,0,0.7)', px: 1.5, py: 0.5, borderRadius: '10px', backdropFilter: 'blur(5px)' }}>
+                        <Typography sx={{ color: videoDuration > 30 ? '#ff5252' : '#4caf50', fontSize: '12px', fontWeight: 600 }}>
+                          {Math.floor(videoDuration)}с / 30с
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <img src={mediaPreviewUrl} alt="preview" style={{ width: '100%', borderRadius: '20px', maxHeight: '400px', objectFit: 'cover' }} />
+                  )}
+                </motion.div>
               )}
-            </Select>
+            </AnimatePresence>
           </Box>
 
-{channels.length === 0 && (
-  <Dialog
-    open={true}
-    onClose={handleClose}
-    PaperProps={{
-      sx: {
-        width: isMobile ? "100%" : "420px",
-        borderRadius: isMobile ? 0 : "16px",
-        background: "linear-gradient(145deg, #0a0a0a, #111)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 0 25px rgba(0,0,0,0.6)",
-        color: "white",
-        p: 3,
-      },
-    }}
-    sx={{
-      "& .MuiBackdrop-root": {
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
-        backdropFilter: "blur(6px)",
-      },
-    }}
-  >
-    <DialogTitle
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        pb: 1,
-      }}
-    >
-      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-        Нет каналов 😕
-      </Typography>
-      <IconButton onClick={handleClose} sx={{ color: "rgba(200,200,200,0.8)" }}>
-        <FiX size={20} />
-      </IconButton>
-    </DialogTitle>
+          {/* TOOLBAR & FOOTER */}
+          <Box sx={{ p: 3, bgcolor: BG_PANEL, backdropFilter: 'blur(10px)', borderTop: BORDER_STYLE }}>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                {/* Инструменты */}
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                    <input ref={fileInputRef} type="file" hidden accept="image/*,video/*" onChange={handleMediaChange} />
+                    <TooltipIconButton icon={<FiImage />} label="Фото" onClick={() => fileInputRef.current?.click()} color="#4caf50" />
+                    <TooltipIconButton icon={<FiVideo />} label="Видео" onClick={() => fileInputRef.current?.click()} color="#2196f3" />
+                    <TooltipIconButton icon={<FiSmile />} label="Эмодзи" color="#ffc107" />
+                </Box>
 
-    <DialogContent>
-      <Typography
-        sx={{
-          fontSize: "15px",
-          color: "rgba(220,220,220,0.9)",
-          textAlign: "center",
-          mt: 1,
-        }}
-      >
-        У вас пока нет ни одного канала.  
-        Создайте свой, чтобы публиковать посты и делиться новостями.
-      </Typography>
-    </DialogContent>
+                {/* Выбор канала */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'rgba(255,255,255,0.05)', px: 2, py: 0.8, borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <Typography sx={{ fontSize: '12px', color: '#666', fontWeight: 600 }}>КАНАЛ:</Typography>
+                    <Select
+                        value={selectedChannel}
+                        onChange={(e) => setSelectedChannel(e.target.value)}
+                        variant="standard"
+                        disableUnderline
+                        IconComponent={FiChevronDown}
+                        sx={{ color: 'white', fontSize: '13px', fontWeight: 600, minWidth: '80px' }}
+                    >
+                        {channels.map(ch => (
+                            <MenuItem key={ch._id} value={ch._id} sx={{ fontSize: '14px' }}>
+                                {ch.nick || ch.name}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </Box>
+            </Box>
 
-    <DialogActions sx={{ justifyContent: "center", pb: 2 }}>
-      <Button
-        variant="contained"
-        onClick={handleClose}
-        sx={{
-          background: "linear-gradient(90deg, #be8221, #d89a32)",
-          textTransform: "none",
-          fontWeight: "bold",
-          borderRadius: "10px",
-          px: 3,
-          "&:hover": {
-            background: "linear-gradient(90deg, #d89a32, #be8221)",
-          },
-        }}
-      >
-        Понял
-      </Button>
-    </DialogActions>
-  </Dialog>
-)}
+            {error && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#ff5252', mb: 2, bgcolor: 'rgba(255,82,82,0.1)', p: 1, borderRadius: '10px' }}>
+                <FiAlertCircle />
+                <Typography sx={{ fontSize: '13px' }}>{error}</Typography>
+              </Box>
+            )}
 
-
-          {error && (
-            <Typography sx={{ color: "red", fontSize: 13, mt: 1 }}>
-              {error}
-            </Typography>
-          )}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontSize: '11px', color: '#555', maxWidth: '60%' }}>
+                    Публикуя контент, вы подтверждаете соблюдение <span style={{ color: '#888' }}>стандартов AtomGlide</span>
+                </Typography>
+                
+                <Button
+                    onClick={handleSendPost}
+                    disabled={loading || !inputText.trim() || channels.length === 0}
+                    variant="contained"
+                    endIcon={loading ? <CircularProgress size={16} color="inherit" /> : <IoMdSend />}
+                    sx={{
+                        bgcolor: ACCENT_COLOR,
+                        borderRadius: '16px',
+                        px: 4, py: 1.2,
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        boxShadow: `0 8px 20px rgba(237, 93, 25, 0.3)`,
+                        '&:hover': { bgcolor: '#d44d15', boxShadow: `0 10px 25px rgba(237, 93, 25, 0.4)` },
+                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: '#444' }
+                    }}
+                >
+                    {loading ? "Публикация" : "Опубликовать"}
+                </Button>
+            </Box>
+          </Box>
         </Box>
-      </Modal>
-    </>
+      </Fade>
+    </Modal>
   );
 };
 
-export default PostCreatorModal;
+// Вспомогательный компонент кнопки тулбара
+const TooltipIconButton = ({ icon, label, onClick, color }) => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+        <IconButton 
+            onClick={onClick}
+            sx={{ 
+                color: 'white', 
+                bgcolor: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.05)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)', color: color }
+            }}
+        >
+            {React.cloneElement(icon, { size: 20 })}
+        </IconButton>
+        <Typography sx={{ fontSize: '10px', color: '#555', fontWeight: 700 }}>{label.toUpperCase()}</Typography>
+    </Box>
+);
 
-/*
- AtomGlide Front-end Client
- Author: Dmitry Khorov
- GitHub: DKhorov
- Telegram: @dkdevelop @jpegweb
- 2025 Project
-*/
+export default PostCreatorModal;

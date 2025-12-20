@@ -190,7 +190,6 @@ const renderUserCard = (user, index, type = 'default') => {
   if (loading) {
     return (
       <Box sx={{ 
-        width: isMobile ? '100vw' : '550px',
         display: 'flex', 
         justifyContent: 'center', 
         alignItems: 'center', 
@@ -204,7 +203,6 @@ const renderUserCard = (user, index, type = 'default') => {
   if (error) {
     return (
       <Box sx={{ 
-        width: isMobile ? '100vw' : '550px',
         p: 2 
       }}>
         <Typography color="error">{error}</Typography>
@@ -217,9 +215,7 @@ const renderUserCard = (user, index, type = 'default') => {
 
   return (
     <Box sx={{
-        width: isMobile ? '100vw' : '550px',
-        maxWidth: isMobile ? '100vw' : '550px',
-        minWidth: isMobile ? '0' : '200px',
+        
         height: isMobile ? '100vh' : '100vh',
         flex: isMobile ? 1 : 'none',
         overflowY: 'auto',

@@ -71,9 +71,7 @@ const Wallet = ({ onBack }) => {
   return (
     <Box
       sx={{
-        width: isMobile ? '100vw' : '450px',
-        maxWidth: isMobile ? '100vw' : '450px',
-        minWidth: isMobile ? '0' : '200px',
+ 
         height: isMobile ? 'calc(100vh - 60px)' : '100vh',
         flex: isMobile ? 1 : 'none',
         overflowY: 'auto',

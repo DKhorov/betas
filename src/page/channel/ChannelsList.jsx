@@ -1,20 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Avatar, Button, CircularProgress } from '@mui/material';
-import { Link } from 'react-router-dom';
+import { Box, Typography, Avatar, List, ListItem, ListItemAvatar, ListItemText, CircularProgress, Button, Snackbar, Alert, useMediaQuery } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import axios from '../../system/axios';
 
-const ChannelsList = () => {
+const Channels = () => {
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [snackbar, setSnackbar] = useState('');
+  const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width:900px)');
 
   useEffect(() => {
     const fetchChannels = async () => {
       try {
         const res = await axios.get('/channels');
         setChannels(res.data);
+        setLoading(false);
       } catch (err) {
-        console.error('Ошибка загрузки каналов:', err);
-      } finally {
+        setError('Не удалось загрузить каналы');
         setLoading(false);
       }
     };
@@ -22,65 +26,100 @@ const ChannelsList = () => {
   }, []);
 
   if (loading) {
-    return <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 5 }} />;
-  }
-
-  if (channels.length === 0) {
     return (
-      <Box sx={{ textAlign: 'center', mt: 5 }}>
-        <Typography variant="h6" sx={{ color: 'gray' }}>
-          🤷 Каналов пока нет
-        </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <CircularProgress />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto', mt: 3 }}>
-      <Typography variant="h5" sx={{ mb: 2 }}>
-        Все каналы
-      </Typography>
-
-      {channels.map((ch) => (
-        <Box
-          key={ch._id}
+     <Box     sx={{
+           
+            height: isMobile ? '100vh' : '100vh',
+            flex: isMobile ? 1 : 'none',
+            overflowY: 'auto',
+          
+            scrollbarWidth: 'none', 
+            msOverflowStyle: 'none', 
+            '&::-webkit-scrollbar': {
+              width: '0px', 
+              background: 'transparent',
+            },
+            paddingBottom: isMobile ? '70px' : 0, 
+            pl: 0, 
+                    pr: 0, 
+      px:1,
+            
+          }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography sx={{ color: 'white', fontSize: '23px',mt:1,ml:1,fontFamily:'sf',fontWeight:'bold' }}>Каналы</Typography>
+        <Button
+          variant="contained"
+          size="small"
+          onClick={() => {
+            if (channels.length >= 5000) {
+              setSnackbar('Вы не можете создать больше 5 каналов');
+            } else {
+              navigate('/create-channel');
+            }
+          }}
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            p: 2,
-            mb: 2,
-            borderRadius: '12px',
-            backgroundColor: 'rgba(17,17,17,0.9)',
-            border: '1px solid rgba(50,50,50,1)'
+            textTransform: 'none',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            mt:1.5,
+             bgcolor: 'rgb(237,89,26)',
+          '&:hover': { bgcolor: 'rgb(215,79,20)' },
+            color: 'white',
           }}
         >
-          <Avatar src={ch.avatarUrl} alt={ch.name} sx={{ width: 50, height: 50, mr: 2 }} />
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 500 }}>
-              {ch.name} <span style={{ color: 'gray', fontSize: '12px' }}>{ch.nick}</span>
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'gray' }}>
-              {ch.description || 'Описание отсутствует'}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'rgb(180,180,180)' }}>
-              Постов: {ch.postsCount || 0}
-            </Typography>
-          </Box>
-          <Link to={`/channel/${ch._id}`} style={{ textDecoration: 'none' }}>
-            <Button size="small" variant="outlined">Перейти</Button>
-          </Link>
+          Создать канал
+        </Button>
+      </Box>
+
+      {channels.length === 0 ? (
+        <Box sx={{ textAlign: 'center', mt: 8 }}>
+          <Typography sx={{ fontSize: '64px' }}>🤷‍♂️</Typography>
+          <Typography sx={{ color: 'gray', fontSize: '15px', mt: 1 }}>А чёт каналов нет…</Typography>
         </Box>
-      ))}
+      ) : (
+        <List>
+          {channels
+            .slice() // копия массива, чтобы не мутировать state
+            .sort((a, b) => b._id.localeCompare(a._id)) // новые каналы сверху
+            .map((ch) => (
+              <ListItem
+                key={ch._id}
+                button
+                onClick={() => navigate(`/channel/${ch._id}`)}
+                sx={{ bgcolor: 'rgb(37,37,37)', borderRadius: 5,mb:1 }}
+              >
+                <ListItemAvatar>
+                  <Avatar src={ch.avatarUrl}>{ch.name ? ch.name.charAt(0).toUpperCase() : 'C'}</Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={<Typography sx={{ color: 'white' }}>{ch.name}</Typography>}
+                  secondary={<Typography sx={{ color: 'gray', fontSize: '13px' }}>{ch.description}</Typography>}
+                />
+                <Typography sx={{ color: 'rgba(150,150,150,1)', fontSize: 12 }}>{ch.nick}</Typography>
+              </ListItem>
+            ))}
+        </List>
+      )}
+
+      <Snackbar open={!!snackbar} autoHideDuration={3000} onClose={() => setSnackbar('')}>
+        <Alert severity="warning" sx={{ width: '100%' }}>
+          {snackbar}
+        </Alert>
+      </Snackbar>
+
+      {error && (
+        <Typography sx={{ color: 'red', fontSize: '13px', mt: 2 }}>{error}</Typography>
+      )}
     </Box>
   );
 };
 
-export default ChannelsList;
-
-/*
- AtomGlide Front-end Client
- Author: Dmitry Khorov
- GitHub: DKhorov
- Telegram: @dkdevelop @jpegweb
- 2025 Project
-*/
+export default Channels;

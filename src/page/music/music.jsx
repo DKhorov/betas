@@ -208,9 +208,7 @@ const Music = () => {
         "&::-webkit-scrollbar": { width: 0 }
       }}
     >
-      {/* HEADER / TOP CHART BANNER */}
-   
-
+  
       {/* --- RECOMMENDATIONS SECTION --- */}
       <Box sx={{ mb: 4 }}>
         <Box sx={{ display:'flex', alignItems:'center', gap: 2, mb: 2 }}>
@@ -293,10 +291,13 @@ const TrackItem = ({ track, index, isLiked, onPlay, onLike, isActive }) => {
       }}
     >
       {/* Cover Image */}
-      <Box sx={{ position: 'relative', width: 60, height: 60 }}>
+      <Box sx={{ position: 'relative', width: 60, height: 60, minWidth: 60, minHeight: 60 }}>
         <Box 
           component="img" 
-          src={track.cover} 
+           src={track.cover || "/1.png"} // 1. Проверка если ссылки вообще нет
+  onError={(e) => {
+    e.target.src = "/1.png"; // 2. Если ссылка битая (ошибка 404)
+  }}
           sx={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:2 }} 
         />
         {isActive && (
@@ -359,6 +360,5 @@ const TrackItem = ({ track, index, isLiked, onPlay, onLike, isActive }) => {
     </Box>
   );
 };
-
 
 export default Music;

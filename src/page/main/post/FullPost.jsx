@@ -104,9 +104,7 @@ const FullPost = () => {
       </Helmet>
 
       <Box  sx={{
-        width: isMobile ? '100vw' : '650px',
-        maxWidth: isMobile ? '100vw' : '650px',
-        minWidth: isMobile ? '0' : '200px',
+    
         height: isMobile ? '100vh' : '100vh',
         flex: isMobile ? 1 : 'none',
         overflowY: 'auto',
@@ -119,7 +117,6 @@ const FullPost = () => {
         },
         paddingBottom: isMobile ? '70px' : 0, 
         pl: 0, 
-        mt:13,
                 pr: 0, 
   px:1,
         
